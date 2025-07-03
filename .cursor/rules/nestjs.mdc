@@ -126,5 +126,8 @@ Generate code, corrections, and refactorings that comply with the basic principl
 - Add a admin/test method to each controller as a smoke test.
 
 ### Build
-- use pnpm and pnpx for all node dependencies.
+- DO NOT USE NPM AND NPX, INSTEAD USE pnpm and pnpx
+
+### Linting Rules
+- End every file with new line, and do not add space at end of "}" when ending a class
  
