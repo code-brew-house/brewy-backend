@@ -10,6 +10,8 @@
 - `src/modules/storage/storage.service.spec.ts` - Unit tests for storage service.
 - `src/modules/storage/storage.controller.spec.ts` - Unit tests for storage controller.
 - `test/storage.e2e-spec.ts` - End-to-end tests for storage API endpoints.
+- `prisma/migrations/20250703010617_create_storage_table/` - Migration files for creating the storage table.
+- `generated/prisma` - Generated Prisma client code.
 
 ### Notes
 
@@ -20,9 +22,9 @@
 
 - [ ] 1.0 Set up database schema and Prisma models for storage records
   - [x] 1.1 Design the storage table schema in `prisma/schema.prisma` (fields: id, url, timestamp, etc.)
-  - [ ] 1.2 Generate and apply Prisma migration for the storage table
-  - [ ] 1.3 Create the `Storage` entity/model in `src/modules/storage/entities/storage.entity.ts`
-  - [ ] 1.4 Update Prisma client and test DB connection
+  - [x] 1.2 Generate and apply Prisma migration for the storage table
+  - [x] 1.3 Create the `Storage` entity/model in `src/modules/storage/entities/storage.entity.ts`
+  - [x] 1.4 Update Prisma client and test DB connection
 
 - [ ] 2.0 Integrate Cloudflare R2 storage and configure S3-compatible SDK
   - [ ] 2.1 Set up Cloudflare R2 bucket and obtain credentials

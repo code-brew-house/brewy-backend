@@ -13,4 +13,14 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
+
+model Storage {
+  id        String   @id @default(uuid())
+  url       String
+  filename  String
+  size      Int
+  mimetype  String
+  timestamp DateTime @default(now())
+} 
