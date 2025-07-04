@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  # NestJS Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    network_mode: host
+    env_file:
+      - path: .env
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=${DATABASE_URL}
+      - DIRECT_URL=${DIRECT_URL}
+      - R2_BUCKET_NAME=${R2_BUCKET_NAME}
+      - R2_ENDPOINT_URL=${R2_ENDPOINT_URL}
+      - R2_ACCESS_KEY_ID=${R2_ACCESS_KEY_ID}
+      - R2_SECRET_ACCESS_KEY=${R2_SECRET_ACCESS_KEY}
+    depends_on:
+      - migrate
+    volumes:
+      - ./uploads:/app/uploads
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Database Migration Service
+  migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: builder
+    network_mode: host
+    env_file:
+      - path: .env
+    environment:
+      - DATABASE_URL=${DATABASE_URL}
+      - DIRECT_URL=${DIRECT_URL}
+    command: ["npx", "prisma", "migrate", "deploy"]
+    restart: "no"
