@@ -25,22 +25,6 @@ export class StorageService {
    */
   async uploadFile(file: Express.Multer.File) {
     try {
-      // Validate file type (MP3 only)
-      const allowedMimeTypes = [
-        'audio/mpeg',
-        'audio/mp3',
-        'audio/mpeg3',
-        'audio/x-mpeg-3',
-        'application/octet-stream',
-      ];
-
-      const isValidMimeType = allowedMimeTypes.includes(file.mimetype);
-      const hasMP3Extension = file.originalname?.toLowerCase().endsWith('.mp3');
-
-      if (!isValidMimeType && !hasMP3Extension) {
-        console.error(`[UPLOAD ERROR] Invalid file type: ${file.mimetype}`);
-        throw new BadRequestException('Only MP3 files are allowed');
-      }
 
       // Validate file size (50MB max)
       const maxSize = 50 * 1024 * 1024; // 50MB in bytes

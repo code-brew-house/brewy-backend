@@ -43,19 +43,13 @@ describe('StorageService', () => {
       stream: new Readable(),
     };
 
-    it('should upload and save a valid MP3 file', async () => {
+    it('should upload and save any file type', async () => {
       mockR2.uploadFile.mockResolvedValue('url');
       mockPrisma.storage.create.mockResolvedValue({ id: '1', url: 'url' });
       const result = await service.uploadFile(validFile);
       expect(result.url).toBe('url');
       expect(mockR2.uploadFile).toHaveBeenCalled();
       expect(mockPrisma.storage.create).toHaveBeenCalled();
-    });
-
-    it('should throw for invalid file type', async () => {
-      await expect(
-        service.uploadFile({ ...validFile, mimetype: 'text/plain' }),
-      ).rejects.toThrow(BadRequestException);
     });
 
     it('should throw for oversized file', async () => {

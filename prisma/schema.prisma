@@ -23,4 +23,38 @@ model Storage {
   size      Int
   mimetype  String
   timestamp DateTime @default(now())
+  
+  jobs      Job[]
+}
+
+enum JobStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+model Job {
+  id          String    @id @default(uuid())
+  status      JobStatus @default(pending)
+  fileId      String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  startedAt   DateTime?
+  completedAt DateTime?
+  error       String?
+  
+  storage     Storage   @relation(fields: [fileId], references: [id])
+  results     AnalysisResult[]
+}
+
+model AnalysisResult {
+  id          String   @id @default(uuid())
+  jobId       String
+  transcript  String
+  sentiment   String
+  metadata    Json?
+  createdAt   DateTime @default(now())
+  
+  job         Job      @relation(fields: [jobId], references: [id])
 } 
