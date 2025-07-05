@@ -6,7 +6,7 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "nest build",
+    "build": "nest build && prisma generate",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
@@ -22,7 +22,8 @@
     "docker:run": "docker run -p 3000:3000 --env-file .env brewy-backend",
     "docker:up": "docker-compose up -d",
     "docker:down": "docker-compose down",
-    "docker:logs": "docker-compose logs -f app"
+    "docker:logs": "docker-compose logs -f app",
+    "prisma:generate": "prisma generate"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.842.0",
