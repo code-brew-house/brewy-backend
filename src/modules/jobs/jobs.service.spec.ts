@@ -6,7 +6,6 @@ import { JobStatus } from '../../../generated/prisma';
 
 describe('JobsService', () => {
   let service: JobsService;
-  let prismaService: PrismaService;
 
   const mockPrismaService = {
     job: {
@@ -30,7 +29,6 @@ describe('JobsService', () => {
     }).compile();
 
     service = module.get<JobsService>(JobsService);
-    prismaService = module.get<PrismaService>(PrismaService);
   });
 
   afterEach(() => {
@@ -134,6 +132,31 @@ describe('JobsService', () => {
         },
       });
       expect(result).toEqual(mockJob);
+    });
+
+    it('should handle job not found during status update', async () => {
+      const jobId = 'nonexistent-job-id';
+      const status = JobStatus.completed;
+
+      const notFoundError = new Error('Record not found');
+      Object.assign(notFoundError, { code: 'P2025' });
+      mockPrismaService.job.update.mockRejectedValue(notFoundError);
+
+      await expect(service.updateStatus(jobId, status)).rejects.toThrow(
+        'Record not found',
+      );
+    });
+
+    it('should handle database transaction failure', async () => {
+      const jobId = 'test-job-id';
+      const status = JobStatus.failed;
+
+      const transactionError = new Error('Transaction failed');
+      mockPrismaService.job.update.mockRejectedValue(transactionError);
+
+      await expect(service.updateStatus(jobId, status)).rejects.toThrow(
+        'Transaction failed',
+      );
     });
 
     it('should update job status to completed and set completedAt', async () => {

@@ -71,3 +71,8 @@ Nest is an MIT-licensed open source project. It can grow thanks to the sponsors 
 ## License
 
 Nest is [MIT licensed](LICENSE).
+
+## Environment Variables
+
+- `N8N_WEBHOOK_URL`: The URL for the N8N webhook endpoint. Required for audio analysis workflow integration.
+- `N8N_WEBHOOK_SECRET`: (Optional) Secret token for authenticating incoming N8N webhook requests. Set this if your N8N workflow requires a secret for security.

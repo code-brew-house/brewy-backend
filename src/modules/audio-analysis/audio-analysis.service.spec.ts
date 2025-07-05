@@ -3,21 +3,12 @@ import { AudioAnalysisService } from './audio-analysis.service';
 import { StorageService } from '../storage/storage.service';
 import { JobsService } from '../jobs/jobs.service';
 import { AnalysisResultsService } from './analysis-results.service';
-import { ConfigService } from '@nestjs/config';
+import { N8NWebhookService } from './n8n-webhook.service';
 import { BadRequestException } from '@nestjs/common';
 import { JobStatus } from '../../../generated/prisma';
-import axios from 'axios';
-
-// Mock axios
-jest.mock('axios');
-const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 describe('AudioAnalysisService', () => {
   let service: AudioAnalysisService;
-  let storageService: StorageService;
-  let jobsService: JobsService;
-  let analysisResultsService: AnalysisResultsService;
-  let configService: ConfigService;
 
   const mockStorageService = {
     uploadFile: jest.fn(),
@@ -34,8 +25,8 @@ describe('AudioAnalysisService', () => {
     findByJobId: jest.fn(),
   };
 
-  const mockConfigService = {
-    get: jest.fn(),
+  const mockN8NWebhookService = {
+    triggerWebhook: jest.fn(),
   };
 
   beforeEach(async () => {
@@ -55,22 +46,17 @@ describe('AudioAnalysisService', () => {
           useValue: mockAnalysisResultsService,
         },
         {
-          provide: ConfigService,
-          useValue: mockConfigService,
+          provide: N8NWebhookService,
+          useValue: mockN8NWebhookService,
         },
       ],
     }).compile();
 
     service = module.get<AudioAnalysisService>(AudioAnalysisService);
-    storageService = module.get<StorageService>(StorageService);
-    jobsService = module.get<JobsService>(JobsService);
-    analysisResultsService = module.get<AnalysisResultsService>(AnalysisResultsService);
-    configService = module.get<ConfigService>(ConfigService);
   });
 
   afterEach(() => {
     jest.clearAllMocks();
-    mockedAxios.post.mockClear();
   });
 
   describe('uploadAndProcess', () => {
@@ -100,55 +86,19 @@ describe('AudioAnalysisService', () => {
     beforeEach(() => {
       mockStorageService.uploadFile.mockResolvedValue(mockStorageRecord);
       mockJobsService.create.mockResolvedValue(mockJob);
-      mockedAxios.post.mockResolvedValue({ status: 200, data: { success: true } });
+      mockN8NWebhookService.triggerWebhook.mockResolvedValue({ success: true });
     });
 
     it('should successfully upload file and trigger N8N webhook', async () => {
-      // Create a service instance with webhook URL configured
-      mockConfigService.get.mockReturnValue('https://n8n.example.com/webhook');
-      
-      const moduleWithWebhook: TestingModule = await Test.createTestingModule({
-        providers: [
-          AudioAnalysisService,
-          {
-            provide: StorageService,
-            useValue: mockStorageService,
-          },
-          {
-            provide: JobsService,
-            useValue: mockJobsService,
-          },
-          {
-            provide: AnalysisResultsService,
-            useValue: mockAnalysisResultsService,
-          },
-          {
-            provide: ConfigService,
-            useValue: { get: jest.fn().mockReturnValue('https://n8n.example.com/webhook') },
-          },
-        ],
-      }).compile();
-
-      const serviceWithWebhook = moduleWithWebhook.get<AudioAnalysisService>(AudioAnalysisService);
-
-      const result = await serviceWithWebhook.uploadAndProcess(mockFile);
+      const result = await service.uploadAndProcess(mockFile);
 
       expect(mockStorageService.uploadFile).toHaveBeenCalledWith(mockFile);
       expect(mockJobsService.create).toHaveBeenCalledWith(mockStorageRecord.id);
-      expect(mockedAxios.post).toHaveBeenCalledWith(
-        'https://n8n.example.com/webhook',
-        {
-          jobId: mockJob.id,
-          fileUrl: mockStorageRecord.url,
-          timestamp: expect.any(String),
-        },
-        {
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          timeout: 10000,
-        },
-      );
+      expect(mockN8NWebhookService.triggerWebhook).toHaveBeenCalledWith({
+        jobId: mockJob.id,
+        fileUrl: mockStorageRecord.url,
+        timestamp: expect.any(String),
+      });
       expect(mockJobsService.updateStatus).toHaveBeenCalledWith(
         mockJob.id,
         JobStatus.processing,
@@ -195,35 +145,100 @@ describe('AudioAnalysisService', () => {
       );
     });
 
+    it('should accept file exactly at 20MB limit', async () => {
+      const maxSizeFile = {
+        ...mockFile,
+        size: 20 * 1024 * 1024, // Exactly 20MB
+      };
+
+      const result = await service.uploadAndProcess(maxSizeFile);
+
+      expect(mockStorageService.uploadFile).toHaveBeenCalledWith(maxSizeFile);
+      expect(result).toEqual({
+        jobId: mockJob.id,
+        fileId: mockStorageRecord.id,
+        status: mockJob.status,
+        message: 'File uploaded successfully, processing started',
+      });
+    });
+
+    it('should accept MP3 file with alternative mime type', async () => {
+      const alternativeMimeFile = {
+        ...mockFile,
+        mimetype: 'audio/mp3',
+      };
+
+      const result = await service.uploadAndProcess(alternativeMimeFile);
+
+      expect(mockStorageService.uploadFile).toHaveBeenCalledWith(
+        alternativeMimeFile,
+      );
+      expect(result).toEqual({
+        jobId: mockJob.id,
+        fileId: mockStorageRecord.id,
+        status: mockJob.status,
+        message: 'File uploaded successfully, processing started',
+      });
+    });
+
+    it('should accept MP3 file with octet-stream mime type but .mp3 extension', async () => {
+      const octetStreamFile = {
+        ...mockFile,
+        mimetype: 'application/octet-stream',
+        originalname: 'test.mp3',
+      };
+
+      const result = await service.uploadAndProcess(octetStreamFile);
+
+      expect(mockStorageService.uploadFile).toHaveBeenCalledWith(
+        octetStreamFile,
+      );
+      expect(result).toEqual({
+        jobId: mockJob.id,
+        fileId: mockStorageRecord.id,
+        status: mockJob.status,
+        message: 'File uploaded successfully, processing started',
+      });
+    });
+
+    it('should accept file with valid mime type even with wrong extension', async () => {
+      const wrongExtensionFile = {
+        ...mockFile,
+        originalname: 'test.wav',
+        mimetype: 'audio/mpeg',
+      };
+
+      const result = await service.uploadAndProcess(wrongExtensionFile);
+
+      expect(mockStorageService.uploadFile).toHaveBeenCalledWith(
+        wrongExtensionFile,
+      );
+      expect(result).toEqual({
+        jobId: mockJob.id,
+        fileId: mockStorageRecord.id,
+        status: mockJob.status,
+        message: 'File uploaded successfully, processing started',
+      });
+    });
+
+    it('should throw BadRequestException for invalid mime type and wrong extension', async () => {
+      const invalidFile = {
+        ...mockFile,
+        originalname: 'test.wav',
+        mimetype: 'audio/wav',
+      };
+
+      await expect(service.uploadAndProcess(invalidFile)).rejects.toThrow(
+        new BadRequestException('Only MP3 files are allowed'),
+      );
+    });
+
     it('should handle N8N webhook failure and update job status to failed', async () => {
-      mockedAxios.post.mockRejectedValue(new Error('Network error'));
+      mockN8NWebhookService.triggerWebhook.mockRejectedValue(
+        new Error('Network error'),
+      );
 
-      // Create a service instance with webhook URL configured
-      const moduleWithWebhook: TestingModule = await Test.createTestingModule({
-        providers: [
-          AudioAnalysisService,
-          {
-            provide: StorageService,
-            useValue: mockStorageService,
-          },
-          {
-            provide: JobsService,
-            useValue: mockJobsService,
-          },
-          {
-            provide: AnalysisResultsService,
-            useValue: mockAnalysisResultsService,
-          },
-          {
-            provide: ConfigService,
-            useValue: { get: jest.fn().mockReturnValue('https://n8n.example.com/webhook') },
-          },
-        ],
-      }).compile();
-
-      const serviceWithWebhook = moduleWithWebhook.get<AudioAnalysisService>(AudioAnalysisService);
-
-      await expect(serviceWithWebhook.uploadAndProcess(mockFile)).rejects.toThrow(
+      await expect(service.uploadAndProcess(mockFile)).rejects.toThrow(
         new BadRequestException('Failed to trigger processing workflow'),
       );
 
@@ -234,42 +249,66 @@ describe('AudioAnalysisService', () => {
       );
     });
 
-    it('should skip webhook trigger when N8N_WEBHOOK_URL is not configured', async () => {
-      // Create a new service instance with empty webhook URL
-      const moduleWithEmptyUrl: TestingModule = await Test.createTestingModule({
-        providers: [
-          AudioAnalysisService,
-          {
-            provide: StorageService,
-            useValue: mockStorageService,
-          },
-          {
-            provide: JobsService,
-            useValue: mockJobsService,
-          },
-          {
-            provide: AnalysisResultsService,
-            useValue: mockAnalysisResultsService,
-          },
-          {
-            provide: ConfigService,
-            useValue: { get: jest.fn().mockReturnValue('') },
-          },
-        ],
-      }).compile();
+    it('should handle storage service failure', async () => {
+      mockStorageService.uploadFile.mockRejectedValue(
+        new Error('Storage unavailable'),
+      );
 
-      const serviceWithEmptyUrl = moduleWithEmptyUrl.get<AudioAnalysisService>(AudioAnalysisService);
+      await expect(service.uploadAndProcess(mockFile)).rejects.toThrow(
+        'Storage unavailable',
+      );
+    });
 
-      const result = await serviceWithEmptyUrl.uploadAndProcess(mockFile);
+    it('should handle job creation failure', async () => {
+      mockJobsService.create.mockRejectedValue(
+        new Error('Database connection failed'),
+      );
 
-      expect(mockedAxios.post).not.toHaveBeenCalled();
-      expect(mockJobsService.updateStatus).not.toHaveBeenCalled();
+      await expect(service.uploadAndProcess(mockFile)).rejects.toThrow(
+        'Database connection failed',
+      );
+    });
+
+    it('should handle extremely large metadata', async () => {
+      const largeMetadata = { data: 'x'.repeat(100000) };
+      const fileWithLargeMetadata = { ...mockFile, metadata: largeMetadata };
+
+      // Should still process normally
+      const result = await service.uploadAndProcess(fileWithLargeMetadata);
+
+      expect(mockStorageService.uploadFile).toHaveBeenCalledWith(
+        fileWithLargeMetadata,
+      );
       expect(result).toEqual({
         jobId: mockJob.id,
         fileId: mockStorageRecord.id,
         status: mockJob.status,
         message: 'File uploaded successfully, processing started',
       });
+    });
+
+    it('should handle file with null originalname', async () => {
+      const fileWithNullName = {
+        ...mockFile,
+        originalname: null as any,
+        mimetype: 'audio/wav', // Also change mimetype so validation fails
+      };
+
+      await expect(service.uploadAndProcess(fileWithNullName)).rejects.toThrow(
+        new BadRequestException('Only MP3 files are allowed'),
+      );
+    });
+
+    it('should handle file with empty originalname', async () => {
+      const fileWithEmptyName = {
+        ...mockFile,
+        originalname: '',
+        mimetype: 'audio/wav', // Also change mimetype so validation fails
+      };
+
+      await expect(service.uploadAndProcess(fileWithEmptyName)).rejects.toThrow(
+        new BadRequestException('Only MP3 files are allowed'),
+      );
     });
   });
 
@@ -337,7 +376,9 @@ describe('AudioAnalysisService', () => {
 
       const result = await service.getAnalysisResults('job-id');
 
-      expect(mockAnalysisResultsService.findByJobId).toHaveBeenCalledWith('job-id');
+      expect(mockAnalysisResultsService.findByJobId).toHaveBeenCalledWith(
+        'job-id',
+      );
       expect(result).toEqual({
         id: mockResult.id,
         jobId: mockResult.jobId,
@@ -358,6 +399,16 @@ describe('AudioAnalysisService', () => {
   });
 
   describe('processWebhookCallback', () => {
+    const mockJob = {
+      id: 'job-id',
+      status: JobStatus.processing,
+      storage: { filename: 'test.mp3' },
+    };
+
+    beforeEach(() => {
+      mockJobsService.findById.mockResolvedValue(mockJob);
+    });
+
     it('should process completed webhook callback', async () => {
       const callbackData = {
         jobId: 'job-id',
@@ -367,8 +418,13 @@ describe('AudioAnalysisService', () => {
         metadata: { confidence: 0.95 },
       };
 
+      mockAnalysisResultsService.findByJobId.mockRejectedValue(
+        new Error('Not found'),
+      );
+
       const result = await service.processWebhookCallback(callbackData);
 
+      expect(mockJobsService.findById).toHaveBeenCalledWith('job-id');
       expect(mockAnalysisResultsService.create).toHaveBeenCalledWith({
         jobId: callbackData.jobId,
         transcript: callbackData.transcript,
@@ -391,6 +447,7 @@ describe('AudioAnalysisService', () => {
 
       const result = await service.processWebhookCallback(callbackData);
 
+      expect(mockJobsService.findById).toHaveBeenCalledWith('job-id');
       expect(mockAnalysisResultsService.create).not.toHaveBeenCalled();
       expect(mockJobsService.updateStatus).toHaveBeenCalledWith(
         callbackData.jobId,
@@ -400,7 +457,7 @@ describe('AudioAnalysisService', () => {
       expect(result).toEqual({ success: true });
     });
 
-    it('should not create analysis result when transcript or sentiment is missing', async () => {
+    it('should fail when transcript or sentiment is missing in completed callback', async () => {
       const callbackData = {
         jobId: 'job-id',
         status: 'completed' as const,
@@ -408,11 +465,174 @@ describe('AudioAnalysisService', () => {
         sentiment: 'positive',
       };
 
+      await expect(
+        service.processWebhookCallback(callbackData),
+      ).rejects.toThrow(
+        new BadRequestException(
+          'Missing transcript or sentiment for completed job',
+        ),
+      );
+
+      expect(mockJobsService.updateStatus).toHaveBeenCalledWith(
+        'job-id',
+        JobStatus.failed,
+        'Missing transcript or sentiment in completed webhook',
+      );
+    });
+
+    it('should skip creating duplicate analysis result', async () => {
+      const callbackData = {
+        jobId: 'job-id',
+        status: 'completed' as const,
+        transcript: 'Test transcript',
+        sentiment: 'positive',
+        metadata: { confidence: 0.95 },
+      };
+
+      const existingResult = { id: 'existing-result-id', jobId: 'job-id' };
+      mockAnalysisResultsService.findByJobId.mockResolvedValue(existingResult);
+
       const result = await service.processWebhookCallback(callbackData);
 
       expect(mockAnalysisResultsService.create).not.toHaveBeenCalled();
-      expect(mockJobsService.updateStatus).not.toHaveBeenCalled();
+      expect(mockJobsService.updateStatus).toHaveBeenCalledWith(
+        callbackData.jobId,
+        JobStatus.completed,
+      );
       expect(result).toEqual({ success: true });
+    });
+
+    it('should fail when job is not found', async () => {
+      mockJobsService.findById.mockResolvedValue(null);
+
+      const callbackData = {
+        jobId: 'nonexistent-job-id',
+        status: 'completed' as const,
+        transcript: 'Test transcript',
+        sentiment: 'positive',
+      };
+
+      await expect(
+        service.processWebhookCallback(callbackData),
+      ).rejects.toThrow(new BadRequestException('Job not found'));
+    });
+
+    it('should fail with unknown status', async () => {
+      const callbackData = {
+        jobId: 'job-id',
+        status: 'unknown' as any,
+      };
+
+      await expect(
+        service.processWebhookCallback(callbackData),
+      ).rejects.toThrow(
+        new BadRequestException('Unknown status in webhook callback'),
+      );
+
+      expect(mockJobsService.updateStatus).toHaveBeenCalledWith(
+        'job-id',
+        JobStatus.failed,
+        'Unknown status in webhook callback',
+      );
+    });
+
+    it('should handle database errors during webhook processing', async () => {
+      const callbackData = {
+        jobId: 'job-id',
+        status: 'completed' as const,
+        transcript: 'Test transcript',
+        sentiment: 'positive',
+        metadata: { confidence: 0.95 },
+      };
+
+      mockAnalysisResultsService.findByJobId.mockRejectedValue(
+        new Error('Not found'),
+      );
+      mockAnalysisResultsService.create.mockRejectedValue(
+        new Error('Database error'),
+      );
+
+      await expect(
+        service.processWebhookCallback(callbackData),
+      ).rejects.toThrow('Database error');
+    });
+
+    it('should handle malformed metadata in webhook callback', async () => {
+      const callbackData = {
+        jobId: 'job-id-metadata',
+        status: 'completed' as const,
+        transcript: 'Test transcript',
+        sentiment: 'positive',
+        metadata: null, // Invalid metadata
+      };
+
+      mockAnalysisResultsService.findByJobId.mockRejectedValue(
+        new Error('Not found'),
+      );
+      mockAnalysisResultsService.create.mockResolvedValue({
+        id: 'result-id',
+      } as any);
+
+      const result = await service.processWebhookCallback(callbackData);
+
+      expect(mockAnalysisResultsService.create).toHaveBeenCalledWith({
+        jobId: callbackData.jobId,
+        transcript: callbackData.transcript,
+        sentiment: callbackData.sentiment,
+        metadata: null,
+      });
+      expect(result).toEqual({ success: true });
+    });
+
+    it('should handle extremely long transcript in webhook callback', async () => {
+      const callbackData = {
+        jobId: 'job-id-long',
+        status: 'completed' as const,
+        transcript: 'A'.repeat(50000), // Very long transcript
+        sentiment: 'positive',
+        metadata: { confidence: 0.95 },
+      };
+
+      mockAnalysisResultsService.findByJobId.mockRejectedValue(
+        new Error('Not found'),
+      );
+      mockAnalysisResultsService.create.mockResolvedValue({
+        id: 'result-id',
+      } as any);
+
+      const result = await service.processWebhookCallback(callbackData);
+
+      expect(mockAnalysisResultsService.create).toHaveBeenCalledWith({
+        jobId: callbackData.jobId,
+        transcript: callbackData.transcript,
+        sentiment: callbackData.sentiment,
+        metadata: callbackData.metadata,
+      });
+      expect(result).toEqual({ success: true });
+    });
+
+    it('should handle job service failure during status update', async () => {
+      const callbackData = {
+        jobId: 'job-id-status-fail',
+        status: 'completed' as const,
+        transcript: 'Test transcript',
+        sentiment: 'positive',
+        metadata: { confidence: 0.95 },
+      };
+
+      mockAnalysisResultsService.findByJobId.mockRejectedValue(
+        new Error('Not found'),
+      );
+      mockAnalysisResultsService.create.mockResolvedValue({
+        id: 'result-id',
+      } as any);
+      mockJobsService.updateStatus.mockRejectedValue(
+        new Error('Status update failed'),
+      );
+
+      await expect(
+        service.processWebhookCallback(callbackData),
+      ).rejects.toThrow('Status update failed');
     });
   });
 });

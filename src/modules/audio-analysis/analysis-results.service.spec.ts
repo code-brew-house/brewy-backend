@@ -5,7 +5,6 @@ import { NotFoundException } from '@nestjs/common';
 
 describe('AnalysisResultsService', () => {
   let service: AnalysisResultsService;
-  let prismaService: PrismaService;
 
   const mockPrismaService = {
     analysisResult: {
@@ -28,7 +27,6 @@ describe('AnalysisResultsService', () => {
     }).compile();
 
     service = module.get<AnalysisResultsService>(AnalysisResultsService);
-    prismaService = module.get<PrismaService>(PrismaService);
   });
 
   afterEach(() => {
@@ -58,6 +56,109 @@ describe('AnalysisResultsService', () => {
         data: createData,
       });
       expect(result).toEqual(mockResult);
+    });
+
+    it('should handle database constraint violation (duplicate result)', async () => {
+      const createData = {
+        jobId: 'job-id',
+        transcript: 'Test transcript',
+        sentiment: 'positive',
+        metadata: { confidence: 0.95 },
+      };
+
+      const constraintError = new Error('Unique constraint failed');
+      Object.assign(constraintError, { code: 'P2002' });
+      mockPrismaService.analysisResult.create.mockRejectedValue(
+        constraintError,
+      );
+
+      await expect(service.create(createData)).rejects.toThrow(
+        'Unique constraint failed',
+      );
+    });
+
+    it('should handle database connection errors', async () => {
+      const createData = {
+        jobId: 'job-id',
+        transcript: 'Test transcript',
+        sentiment: 'positive',
+        metadata: { confidence: 0.95 },
+      };
+
+      const connectionError = new Error('Connection timed out');
+      mockPrismaService.analysisResult.create.mockRejectedValue(
+        connectionError,
+      );
+
+      await expect(service.create(createData)).rejects.toThrow(
+        'Connection timed out',
+      );
+    });
+
+    it('should handle foreign key constraint violation', async () => {
+      const createData = {
+        jobId: 'nonexistent-job-id',
+        transcript: 'Test transcript',
+        sentiment: 'positive',
+        metadata: { confidence: 0.95 },
+      };
+
+      const fkError = new Error('Foreign key constraint failed');
+      Object.assign(fkError, { code: 'P2003' });
+      mockPrismaService.analysisResult.create.mockRejectedValue(fkError);
+
+      await expect(service.create(createData)).rejects.toThrow(
+        'Foreign key constraint failed',
+      );
+    });
+
+    it('should handle missing required fields in create data', async () => {
+      const incompleteData = {
+        jobId: 'job-id',
+        // transcript missing
+        sentiment: 'positive',
+      };
+
+      const requiredFieldError = new Error('Field "transcript" is required');
+      mockPrismaService.analysisResult.create.mockRejectedValue(
+        requiredFieldError,
+      );
+
+      await expect(service.create(incompleteData as any)).rejects.toThrow(
+        'Field "transcript" is required',
+      );
+    });
+
+    it('should handle JSON metadata validation', async () => {
+      const createData = {
+        jobId: 'job-id',
+        transcript: 'Test transcript',
+        sentiment: 'positive',
+        metadata: {
+          confidence: 0.95,
+          complexObject: {
+            nested: { deeply: { value: 'test' } },
+            array: [1, 2, 3, { key: 'value' }],
+            nullValue: null,
+            booleanValue: true,
+          },
+        },
+      };
+
+      const mockResult = {
+        id: 'result-id',
+        ...createData,
+        createdAt: new Date(),
+      };
+
+      mockPrismaService.analysisResult.create.mockResolvedValue(mockResult);
+
+      const result = await service.create(createData);
+
+      expect(mockPrismaService.analysisResult.create).toHaveBeenCalledWith({
+        data: createData,
+      });
+      expect(result.metadata).toEqual(createData.metadata);
     });
   });
 

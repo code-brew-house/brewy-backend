@@ -76,11 +76,14 @@ export class AnalysisResultsService {
   /**
    * Update analysis result
    */
-  async update(id: string, data: {
-    transcript?: string;
-    sentiment?: string;
-    metadata?: any;
-  }) {
+  async update(
+    id: string,
+    data: {
+      transcript?: string;
+      sentiment?: string;
+      metadata?: any;
+    },
+  ) {
     const result = await this.prisma.analysisResult.update({
       where: { id },
       data,

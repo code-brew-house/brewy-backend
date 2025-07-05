@@ -1,4 +1,10 @@
-import { IsString, IsEnum, IsOptional, IsDateString, IsUUID } from 'class-validator';
+import {
+  IsString,
+  IsEnum,
+  IsOptional,
+  IsDateString,
+  IsUUID,
+} from 'class-validator';
 
 /**
  * Job entity represents an audio analysis job in the system.

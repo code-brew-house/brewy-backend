@@ -16,11 +16,16 @@
 - `src/modules/audio-analysis/entities/job.entity.ts` - Job entity definition
 - `src/modules/audio-analysis/entities/analysis-result.entity.ts` - Analysis result entity definition
 - `src/app.module.ts` - Root module registration for AudioAnalysisModule
-- `src/modules/audio-analysis/audio-analysis.controller.spec.ts` - Unit tests for controller
+- `src/modules/audio-analysis/audio-analysis.controller.spec.ts` - Unit tests for controller with comprehensive endpoint coverage
 - `src/modules/audio-analysis/audio-analysis.service.spec.ts` - Unit tests for audio analysis service
 - `src/modules/audio-analysis/jobs.service.spec.ts` - Unit tests for jobs service
 - `src/modules/audio-analysis/analysis-results.service.spec.ts` - Unit tests for analysis results service
-- `test/audio-analysis.e2e-spec.ts` - End-to-end tests for audio analysis endpoints
+- `src/modules/audio-analysis/audio-analysis.integration.spec.ts` - Integration tests for all API endpoints
+- `test/audio-analysis.e2e-spec.ts` - Comprehensive end-to-end tests for complete audio analysis workflow
+- `README.md` - Documents required environment variables N8N_WEBHOOK_URL and N8N_WEBHOOK_SECRET for N8N integration
+- `src/modules/audio-analysis/n8n-webhook.service.ts` - Improved error handling for N8N webhook response (logs and throws on non-2xx)
+- `src/modules/audio-analysis/n8n-webhook.service.spec.ts` - Comprehensive unit tests for N8N webhook service with mock responses
+- `src/modules/audio-analysis/database-relationships.spec.ts` - Database relationship and constraint validation tests with real database interactions
 
 ### Notes
 
@@ -59,41 +64,41 @@
   - [x] 3.9 Implement N8N webhook trigger logic in AudioAnalysisService
   - [x] 3.10 Register AudioAnalysisModule in AppModule
 
-- [ ] 4.0 API Endpoints and Controller Development
-  - [ ] 4.1 Create AudioAnalysisController with proper decorators and imports
-  - [ ] 4.2 Create upload DTOs (UploadAudioDto) with file validation decorators
-  - [ ] 4.3 Create response DTOs (JobStatusDto, AnalysisResultsDto) for consistent API responses
-  - [ ] 4.4 Create webhook DTOs (WebhookDto) for N8N communication
-  - [ ] 4.5 Implement POST /audio-analysis/upload endpoint with file validation
-  - [ ] 4.6 Implement GET /audio-analysis/jobs/:jobId endpoint for job status
-  - [ ] 4.7 Implement GET /audio-analysis/jobs/:jobId/results endpoint for analysis results
-  - [ ] 4.8 Implement POST /audio-analysis/webhook endpoint for N8N callbacks
-  - [ ] 4.9 Add proper error handling and HTTP status codes for all endpoints
-  - [ ] 4.10 Add proper validation pipes and guards for all endpoints
+- [x] 4.0 API Endpoints and Controller Development
+  - [x] 4.1 Create AudioAnalysisController with proper decorators and imports
+  - [x] 4.2 Create upload DTOs (UploadAudioDto) with file validation decorators
+  - [x] 4.3 Create response DTOs (JobStatusDto, AnalysisResultsDto) for consistent API responses
+  - [x] 4.4 Create webhook DTOs (WebhookDto) for N8N communication
+  - [x] 4.5 Implement POST /audio-analysis/upload endpoint with file validation
+  - [x] 4.6 Implement GET /audio-analysis/jobs/:jobId endpoint for job status
+  - [x] 4.7 Implement GET /audio-analysis/jobs/:jobId/results endpoint for analysis results
+  - [x] 4.8 Implement POST /audio-analysis/webhook endpoint for N8N callbacks
+  - [x] 4.9 Add proper error handling and HTTP status codes for all endpoints
+  - [x] 4.10 Add proper validation pipes and guards for all endpoints
 
-- [ ] 5.0 N8N Integration and Webhook Implementation
-  - [ ] 5.1 Add N8N webhook URL to environment variables
-  - [ ] 5.2 Add webhook secret/authentication token to environment variables if needed
-  - [ ] 5.3 Implement HTTP client service for N8N webhook calls
-  - [ ] 5.4 Create webhook payload structure with file URL and job ID
-  - [ ] 5.5 Implement asynchronous webhook trigger after successful file upload
-  - [ ] 5.6 Implement webhook response handling (success/failure)
-  - [ ] 5.7 Implement webhook endpoint to receive N8N status updates
-  - [ ] 5.8 Implement job status update logic based on N8N callbacks
-  - [ ] 5.9 Implement analysis results storage when processing completes
-  - [ ] 5.10 Implement error handling for failed N8N workflow triggers
-  - [ ] 5.11 Implement webhook validation/authentication if security is required
+- [x] 5.0 N8N Integration and Webhook Implementation
+  - [x] 5.1 Add N8N webhook URL to environment variables
+  - [x] 5.2 Add webhook secret/authentication token to environment variables if needed
+  - [x] 5.3 Implement HTTP client service for N8N webhook calls
+  - [x] 5.4 Create webhook payload structure with file URL and job ID
+  - [x] 5.5 Implement asynchronous webhook trigger after successful file upload
+  - [x] 5.6 Implement webhook response handling (success/failure)
+  - [x] 5.7 Implement webhook endpoint to receive N8N status updates
+  - [x] 5.8 Implement job status update logic based on N8N callbacks
+  - [x] 5.9 Implement analysis results storage when processing completes
+  - [x] 5.10 Implement error handling for failed N8N workflow triggers
+  - [x] 5.11 Implement webhook validation/authentication if security is required
 
-- [ ] 6.0 Testing and Validation
-  - [ ] 6.1 Create unit tests for JobsService with mock PrismaService
-  - [ ] 6.2 Create unit tests for AnalysisResultsService with mock PrismaService
-  - [ ] 6.3 Create unit tests for AudioAnalysisService with mock dependencies
-  - [ ] 6.4 Create unit tests for AudioAnalysisController with mock services
-  - [ ] 6.5 Create integration tests for all API endpoints
-  - [ ] 6.6 Create end-to-end tests for complete audio analysis workflow
-  - [ ] 6.7 Test file upload validation (format, size limits)
-  - [ ] 6.8 Test job status tracking and updates
-  - [ ] 6.9 Test N8N webhook integration (mock N8N responses)
-  - [ ] 6.10 Test error handling for various failure scenarios
-  - [ ] 6.11 Test database relationships and constraints
-  - [ ] 6.12 Run all tests with coverage reporting using `pnpm run test:cov`
+- [x] 6.0 Testing and Validation
+  - [x] 6.1 Create unit tests for JobsService with mock PrismaService
+  - [x] 6.2 Create unit tests for AnalysisResultsService with mock PrismaService
+  - [x] 6.3 Create unit tests for AudioAnalysisService with mock dependencies
+  - [x] 6.4 Create unit tests for AudioAnalysisController with mock services
+  - [x] 6.5 Create integration tests for all API endpoints
+  - [x] 6.6 Create end-to-end tests for complete audio analysis workflow
+  - [x] 6.7 Test file upload validation (format, size limits)
+  - [x] 6.8 Test job status tracking and updates
+  - [x] 6.9 Test N8N webhook integration (mock N8N responses)
+  - [x] 6.10 Test error handling for various failure scenarios
+  - [x] 6.11 Test database relationships and constraints
+  - [x] 6.12 Run all tests with coverage reporting using `pnpm run test:cov`

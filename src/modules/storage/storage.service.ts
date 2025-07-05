@@ -25,7 +25,6 @@ export class StorageService {
    */
   async uploadFile(file: Express.Multer.File) {
     try {
-
       // Validate file size (50MB max)
       const maxSize = 50 * 1024 * 1024; // 50MB in bytes
       if (file.size > maxSize) {

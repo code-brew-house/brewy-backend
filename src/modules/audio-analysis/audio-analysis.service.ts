@@ -1,10 +1,10 @@
 import { Injectable, BadRequestException, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import axios from 'axios';
 import { JobStatus } from '../../../generated/prisma';
 import { StorageService } from '../storage/storage.service';
 import { JobsService } from '../jobs/jobs.service';
 import { AnalysisResultsService } from './analysis-results.service';
+import { N8NWebhookService } from './n8n-webhook.service';
+import { N8NWebhookPayloadDto } from './dto/webhook.dto';
 
 /**
  * AudioAnalysisService orchestrates the complete audio analysis workflow.
@@ -13,85 +13,48 @@ import { AnalysisResultsService } from './analysis-results.service';
 @Injectable()
 export class AudioAnalysisService {
   private readonly logger = new Logger(AudioAnalysisService.name);
-  private readonly n8nWebhookUrl: string;
 
   constructor(
     private readonly storageService: StorageService,
     private readonly jobsService: JobsService,
     private readonly analysisResultsService: AnalysisResultsService,
-    private readonly configService: ConfigService,
-  ) {
-    this.n8nWebhookUrl = this.configService.get<string>('N8N_WEBHOOK_URL') || '';
-  }
+    private readonly n8nWebhookService: N8NWebhookService,
+  ) {}
 
   /**
    * Upload and process audio file through the complete workflow
    */
   async uploadAndProcess(file: Express.Multer.File) {
-    // Validate file before processing
     this.validateAudioFile(file);
-
-    // Upload file to storage
     const storageRecord = await this.storageService.uploadFile(file);
-
-    // Create job for processing
     const job = await this.jobsService.create(storageRecord.id);
-
-    // Trigger N8N webhook for processing
-    await this.triggerN8NWebhook(job.id, storageRecord.url);
-    
+    const payload: N8NWebhookPayloadDto = {
+      jobId: job.id,
+      fileUrl: storageRecord.url,
+      timestamp: new Date().toISOString(),
+    };
+    try {
+      await this.n8nWebhookService.triggerWebhook(payload);
+      await this.jobsService.updateStatus(job.id, JobStatus.processing);
+    } catch (error) {
+      this.logger.error(
+        `Failed to trigger N8N webhook for job ${job.id}:`,
+        error instanceof Error ? error.stack : error,
+        payload,
+      );
+      await this.jobsService.updateStatus(
+        job.id,
+        JobStatus.failed,
+        `Failed to trigger N8N webhook: ${error.message}`,
+      );
+      throw new BadRequestException('Failed to trigger processing workflow');
+    }
     return {
       jobId: job.id,
       fileId: storageRecord.id,
       status: job.status,
       message: 'File uploaded successfully, processing started',
     };
-  }
-
-  /**
-   * Trigger N8N webhook for audio analysis processing
-   */
-  private async triggerN8NWebhook(jobId: string, fileUrl: string): Promise<void> {
-    try {
-      if (!this.n8nWebhookUrl) {
-        this.logger.warn('N8N_WEBHOOK_URL not configured, skipping webhook trigger');
-        return;
-      }
-
-      const payload = {
-        jobId,
-        fileUrl,
-        timestamp: new Date().toISOString(),
-      };
-
-      this.logger.log(`Triggering N8N webhook for job ${jobId}`);
-      
-      const response = await axios.post(this.n8nWebhookUrl, payload, {
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        timeout: 10000, // 10 second timeout
-      });
-
-      if (response.status >= 200 && response.status < 300) {
-        this.logger.log(`N8N webhook triggered successfully for job ${jobId}`);
-        // Update job status to processing
-        await this.jobsService.updateStatus(jobId, JobStatus.processing);
-      } else {
-        throw new Error(`N8N webhook returned status ${response.status}`);
-      }
-    } catch (error) {
-      this.logger.error(`Failed to trigger N8N webhook for job ${jobId}:`, error);
-      
-      // Update job status to failed
-      await this.jobsService.updateStatus(
-        jobId,
-        JobStatus.failed,
-        `Failed to trigger N8N webhook: ${error.message}`,
-      );
-      
-      throw new BadRequestException('Failed to trigger processing workflow');
-    }
   }
 
   /**
@@ -136,7 +99,7 @@ export class AudioAnalysisService {
    */
   async getJobStatus(jobId: string) {
     const job = await this.jobsService.findById(jobId);
-    
+
     return {
       id: job.id,
       status: job.status,
@@ -159,7 +122,7 @@ export class AudioAnalysisService {
    */
   async getAnalysisResults(jobId: string) {
     const result = await this.analysisResultsService.findByJobId(jobId);
-    
+
     return {
       id: result.id,
       jobId: result.jobId,
@@ -190,23 +153,63 @@ export class AudioAnalysisService {
     error?: string;
   }) {
     const { jobId, status, transcript, sentiment, metadata, error } = data;
-
-    if (status === 'completed' && transcript && sentiment) {
-      // Create analysis results
-      await this.analysisResultsService.create({
-        jobId,
-        transcript,
-        sentiment,
-        metadata,
-      });
-
-      // Update job status to completed
-      await this.jobsService.updateStatus(jobId, JobStatus.completed);
-    } else if (status === 'failed') {
-      // Update job status to failed with error
-      await this.jobsService.updateStatus(jobId, JobStatus.failed, error);
+    const job = await this.jobsService.findById(jobId);
+    if (!job) {
+      this.logger.warn(`Webhook callback for non-existent job: ${jobId}`);
+      throw new BadRequestException('Job not found');
     }
-
+    if (status === 'completed') {
+      if (!transcript || !sentiment) {
+        await this.jobsService.updateStatus(
+          jobId,
+          JobStatus.failed,
+          'Missing transcript or sentiment in completed webhook',
+        );
+        this.logger.error(
+          `Webhook callback missing transcript/sentiment for completed job: ${jobId}`,
+        );
+        throw new BadRequestException(
+          'Missing transcript or sentiment for completed job',
+        );
+      }
+      // Prevent duplicate analysis result creation
+      let existingResult = null;
+      try {
+        existingResult = await this.analysisResultsService.findByJobId(jobId);
+      } catch (err) {}
+      if (!existingResult) {
+        await this.analysisResultsService.create({
+          jobId,
+          transcript,
+          sentiment,
+          metadata,
+        });
+        this.logger.log(`Analysis result stored for job ${jobId}`);
+      } else {
+        this.logger.warn(
+          `Analysis result already exists for job ${jobId}, skipping creation`,
+        );
+      }
+      await this.jobsService.updateStatus(jobId, JobStatus.completed);
+      this.logger.log(`Job ${jobId} marked as completed via webhook`);
+    } else if (status === 'failed') {
+      await this.jobsService.updateStatus(
+        jobId,
+        JobStatus.failed,
+        error || 'Unknown error from N8N',
+      );
+      this.logger.log(`Job ${jobId} marked as failed via webhook: ${error}`);
+    } else {
+      this.logger.warn(
+        `Webhook callback with unknown status for job: ${jobId}`,
+      );
+      await this.jobsService.updateStatus(
+        jobId,
+        JobStatus.failed,
+        'Unknown status in webhook callback',
+      );
+      throw new BadRequestException('Unknown status in webhook callback');
+    }
     return { success: true };
   }
 }

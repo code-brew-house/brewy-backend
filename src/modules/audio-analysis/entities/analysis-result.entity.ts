@@ -1,4 +1,10 @@
-import { IsString, IsOptional, IsObject, IsDateString, IsUUID } from 'class-validator';
+import {
+  IsString,
+  IsOptional,
+  IsObject,
+  IsDateString,
+  IsUUID,
+} from 'class-validator';
 
 /**
  * AnalysisResult entity represents the results of audio analysis from Assembly AI.
