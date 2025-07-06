@@ -162,3 +162,4 @@ Example of splitting commits:
 - Before committing, the command will review the diff to identify if multiple commits would be more appropriate
 - If suggesting multiple commits, it will help you stage and commit the changes separately
 - Always reviews the commit diff to ensure the message matches the changes
+- DO NOT add Co Authored by Claude Code or any other references.
