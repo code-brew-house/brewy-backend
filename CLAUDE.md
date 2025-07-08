@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Important
+- ALL instructions within this document MUST BE FOLLOWED, these are not optional unless explicitly stated.
+- ASK FOR CLARIFICATION If you are uncertain of any of thing within the document.
+- DO NOT edit more code than you have to.
+- DO NOT WASTE TOKENS, be succinct and concise.
+
+## MCP Servers
+- Use Context7 when needing documentation beyond training cutoff
+- Use Serena for Context Management and Searching Through Code
+
 ## Project Overview
 
 This is a NestJS backend application for the Brewy Call Analytics App. The main functionality currently includes MP3 file upload to Cloudflare R2 storage with metadata persistence in a PostgreSQL database via Prisma ORM.

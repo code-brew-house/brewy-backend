@@ -17,13 +17,16 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  username  String   @unique
-  email     String   @unique
-  password  String
-  fullName  String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id              String    @id @default(uuid())
+  username        String    @unique
+  email           String    @unique
+  password        String
+  fullName        String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  failedAttempts  Int       @default(0)
+  lockedUntil     DateTime?
+  lastFailedLogin DateTime?
 
   @@index([username])
   @@index([email])

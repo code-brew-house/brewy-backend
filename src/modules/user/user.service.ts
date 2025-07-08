@@ -60,7 +60,10 @@ export class UserService {
       });
 
       console.log(`[CREATE SUCCESS] User created: ${user.id}`);
-      return new UserResponseDto(user);
+      // Manually exclude password field
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password: _, ...userWithoutPassword } = user;
+      return new UserResponseDto(userWithoutPassword);
     } catch (error) {
       console.error(`[CREATE ERROR] Failed to create user: ${error.message}`);
       if (error instanceof ConflictException) {
@@ -139,7 +142,10 @@ export class UserService {
       }
 
       console.log(`[FIND SUCCESS] User retrieved: ${id}`);
-      return new UserResponseDto(user);
+      // Manually exclude password field
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password: _, ...userWithoutPassword } = user;
+      return new UserResponseDto(userWithoutPassword);
     } catch (error) {
       console.error(`[FIND ERROR] Failed to find user by ID: ${error.message}`);
       if (error instanceof NotFoundException) {
@@ -165,7 +171,10 @@ export class UserService {
       });
 
       console.log(`[UPDATE SUCCESS] User updated: ${id}`);
-      return new UserResponseDto(user);
+      // Manually exclude password field
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password: _, ...userWithoutPassword } = user;
+      return new UserResponseDto(userWithoutPassword);
     } catch (error) {
       if (error.code === 'P2025') {
         console.error(`[UPDATE ERROR] User not found: ${id}`);

@@ -9,9 +9,9 @@ import {
 import { Transform } from 'class-transformer';
 
 /**
- * DTO for creating a new user with comprehensive validation rules
+ * DTO for user registration with comprehensive validation rules matching PRD requirements
  */
-export class CreateUserDto {
+export class RegisterDto {
   /** Username with comprehensive format validation */
   @IsString({ message: 'Username must be a string' })
   @IsNotEmpty({ message: 'Username is required' })
@@ -40,7 +40,7 @@ export class CreateUserDto {
   )
   @MaxLength(254, { message: 'Email address is too long' })
   @IsEmail({}, { message: 'Please provide a valid email address' })
-  @Matches(/^[^<>;"'()\\]+$/, {
+  @Matches(/^[^<>;\"'()\\\\]+$/, {
     message: 'Email contains invalid characters',
   })
   email: string;
@@ -59,20 +59,23 @@ export class CreateUserDto {
   )
   password: string;
 
-  /** Full name with format validation */
+  /** Full name with format validation matching PRD requirements (2-100 characters) */
   @IsString({ message: 'Full name must be a string' })
   @IsNotEmpty({ message: 'Full name is required' })
   @Transform(({ value }: { value: any }) =>
     typeof value === 'string' ? value.trim() : value,
   )
-  @MinLength(1, { message: 'Full name cannot be empty' })
+  @MinLength(2, { message: 'Full name must be at least 2 characters long' })
   @MaxLength(100, { message: 'Full name must not exceed 100 characters' })
-  @Matches(/^[a-zA-ZÀ-ÿ\s'-]+$/, {
+  @Matches(/^[a-zA-Z0-9\u00c0-\u00ff\s'-]+$/, {
     message:
-      'Full name can only contain letters, spaces, apostrophes, and hyphens',
+      'Full name can only contain letters, numbers, spaces, apostrophes, and hyphens',
   })
-  @Matches(/^[^\s].*[^\s]$|^[^\s]$/, {
-    message: 'Full name cannot start or end with spaces',
+  @Matches(/^[a-zA-Z]/, {
+    message: 'Full name must start with a letter',
+  })
+  @Matches(/[a-zA-Z]$/, {
+    message: 'Full name must end with a letter',
   })
   fullName: string;
 }

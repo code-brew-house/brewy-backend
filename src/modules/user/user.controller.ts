@@ -7,10 +7,13 @@ import {
   HttpStatus,
   NotFoundException,
   InternalServerErrorException,
-  Request,
+  UseGuards,
 } from '@nestjs/common';
 import { UserService } from './user.service';
 import { UserResponseDto } from './dto/user-response.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { User } from '../../../generated/prisma';
 
 /**
  * UserController handles HTTP endpoints for user management operations.
@@ -22,22 +25,15 @@ export class UserController {
 
   /**
    * Get current user's profile
-   * @param req - Request object containing authenticated user
+   * @param user - Current authenticated user from JWT token
    * @returns Current user's profile information
    */
   @Get('profile')
   @HttpCode(HttpStatus.OK)
-  // @UseGuards(JwtAuthGuard) // Will be implemented in AuthModule
-  async getProfile(@Request() req: any): Promise<UserResponseDto> {
+  @UseGuards(JwtAuthGuard)
+  async getProfile(@CurrentUser() user: User): Promise<UserResponseDto> {
     try {
-      // For now, we'll use a placeholder. This will be properly implemented
-      // when JWT authentication is added in the AuthModule
-      const userId = req.user?.id || req.user?.sub;
-      if (!userId || typeof userId !== 'string') {
-        throw new NotFoundException('User not authenticated');
-      }
-
-      return await this.userService.findById(userId);
+      return await this.userService.findById(user.id);
     } catch (error) {
       if (error instanceof NotFoundException) {
         throw error;
@@ -53,6 +49,7 @@ export class UserController {
    */
   @Get(':id')
   @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
   async getUserById(
     @Param('id', ParseUUIDPipe) id: string,
   ): Promise<UserResponseDto> {
