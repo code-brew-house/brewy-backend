@@ -2,45 +2,48 @@ import {
   Controller,
   Post,
   Get,
-  Body,
   Param,
   UploadedFile,
   UseInterceptors,
-  UsePipes,
-  ValidationPipe,
+  UseGuards,
   BadRequestException,
   NotFoundException,
   InternalServerErrorException,
   ParseUUIDPipe,
   HttpStatus,
   HttpCode,
-  Headers,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AudioAnalysisService } from './audio-analysis.service';
 import { JobStatusDto } from './dto/job-status.dto';
 import { AnalysisResultsDto } from './dto/analysis-results.dto';
-import { N8NWebhookCallbackDto, WebhookResponseDto } from './dto/webhook.dto';
-import { ConfigService } from '@nestjs/config';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { OrganizationGuard } from '../../common/guards/organization.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { Organization } from '../../common/decorators/organization.decorator';
+import { RequestUser } from '../../common/types/request.types';
 
 /**
- * AudioAnalysisController handles HTTP endpoints for audio analysis workflow.
+ * AudioAnalysisController handles HTTP endpoints for audio analysis workflow
+ * with organization-scoped access control and role-based permissions.
  * Provides endpoints for file upload, job status tracking, and result retrieval.
  */
 @Controller('audio-analysis')
+@UseGuards(JwtAuthGuard, RolesGuard, OrganizationGuard)
 export class AudioAnalysisController {
-  constructor(
-    private readonly audioAnalysisService: AudioAnalysisService,
-    private readonly configService: ConfigService,
-  ) {}
+  constructor(private readonly audioAnalysisService: AudioAnalysisService) {}
 
   /**
    * Upload audio file for analysis
    * @param file - MP3 audio file (max 20MB)
+   * @param organizationId - Organization ID from authenticated user
    * @returns Job information with processing status
    */
   @Post('upload')
   @HttpCode(HttpStatus.CREATED)
+  @Roles('OWNER', 'ADMIN', 'AGENT')
   @UseInterceptors(
     FileInterceptor('file', {
       limits: {
@@ -72,13 +75,19 @@ export class AudioAnalysisController {
       },
     }),
   )
-  async uploadAudio(@UploadedFile() file: Express.Multer.File) {
+  async uploadAudio(
+    @UploadedFile() file: Express.Multer.File,
+    @Organization() organizationId: string,
+  ) {
     if (!file) {
       throw new BadRequestException('Audio file is required');
     }
 
     try {
-      return await this.audioAnalysisService.uploadAndProcess(file);
+      return await this.audioAnalysisService.uploadAndProcess(
+        file,
+        organizationId,
+      );
     } catch (error) {
       if (error.message?.includes('File size')) {
         throw new BadRequestException('File size exceeds 20MB limit');
@@ -96,15 +105,22 @@ export class AudioAnalysisController {
   /**
    * Get job status by ID
    * @param jobId - UUID of the job to retrieve status for
+   * @param user - Current authenticated user
+   * @param organizationId - Organization ID from authenticated user
    * @returns Job status information including file details and timestamps
    */
   @Get('jobs/:jobId')
   @HttpCode(HttpStatus.OK)
+  @Roles('SUPER_OWNER', 'OWNER', 'ADMIN', 'AGENT')
   async getJobStatus(
     @Param('jobId', ParseUUIDPipe) jobId: string,
+    @CurrentUser() user: RequestUser,
+    @Organization() organizationId: string,
   ): Promise<JobStatusDto> {
     try {
-      return await this.audioAnalysisService.getJobStatus(jobId);
+      const filterOrgId =
+        user.role === 'SUPER_OWNER' ? undefined : organizationId;
+      return await this.audioAnalysisService.getJobStatus(jobId, filterOrgId);
     } catch (error) {
       if (error.message?.includes('not found')) {
         throw new NotFoundException(`Job with ID ${jobId} not found`);
@@ -116,15 +132,25 @@ export class AudioAnalysisController {
   /**
    * Get analysis results by job ID
    * @param jobId - UUID of the job to retrieve analysis results for
+   * @param user - Current authenticated user
+   * @param organizationId - Organization ID from authenticated user
    * @returns Analysis results including transcript, sentiment, and metadata
    */
   @Get('jobs/:jobId/results')
   @HttpCode(HttpStatus.OK)
+  @Roles('SUPER_OWNER', 'OWNER', 'ADMIN', 'AGENT')
   async getAnalysisResults(
     @Param('jobId', ParseUUIDPipe) jobId: string,
+    @CurrentUser() user: RequestUser,
+    @Organization() organizationId: string,
   ): Promise<AnalysisResultsDto> {
     try {
-      return await this.audioAnalysisService.getAnalysisResults(jobId);
+      const filterOrgId =
+        user.role === 'SUPER_OWNER' ? undefined : organizationId;
+      return await this.audioAnalysisService.getAnalysisResults(
+        jobId,
+        filterOrgId,
+      );
     } catch (error) {
       if (error.message?.includes('not found')) {
         throw new NotFoundException(
@@ -133,52 +159,6 @@ export class AudioAnalysisController {
       }
       throw new InternalServerErrorException(
         'Failed to retrieve analysis results',
-      );
-    }
-  }
-
-  /**
-   * Webhook endpoint for N8N callbacks
-   * @param data - Webhook payload from N8N containing job results or error information
-   * @returns Success response indicating webhook was processed
-   */
-  @Post('webhook')
-  @HttpCode(HttpStatus.OK)
-  @UsePipes(
-    new ValidationPipe({
-      transform: true,
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      validationError: { target: false, value: false },
-    }),
-  )
-  async processWebhook(
-    @Body() data: N8NWebhookCallbackDto,
-    @Headers() headers: Record<string, string>,
-  ): Promise<WebhookResponseDto> {
-    const expectedSecret = this.configService.get<string>('N8N_WEBHOOK_SECRET');
-    const receivedSecret =
-      headers['x-n8n-webhook-secret'] || headers['X-N8N-WEBHOOK-SECRET'];
-    if (expectedSecret && receivedSecret !== expectedSecret) {
-      throw new BadRequestException('Invalid webhook secret');
-    }
-    try {
-      await this.audioAnalysisService.processWebhookCallback(data);
-      return {
-        success: true,
-        message: 'Webhook processed successfully',
-      };
-    } catch (error) {
-      if (error.message?.includes('not found')) {
-        throw new NotFoundException(`Job not found for webhook processing`);
-      }
-      if (error.message?.includes('validation')) {
-        throw new BadRequestException(
-          `Invalid webhook payload: ${error.message}`,
-        );
-      }
-      throw new InternalServerErrorException(
-        'Failed to process webhook callback',
       );
     }
   }

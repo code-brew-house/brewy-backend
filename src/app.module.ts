@@ -2,6 +2,7 @@ import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_GUARD, APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
 import { ThrottlerModule } from '@nestjs/throttler';
+import { ScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { StorageModule } from './modules/storage/storage.module';
@@ -9,6 +10,7 @@ import { HealthModule } from './modules/health/health.module';
 import { AudioAnalysisModule } from './modules/audio-analysis/audio-analysis.module';
 import { UserModule } from './modules/user/user.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { OrganizationModule } from './modules/organization/organization.module';
 import { PrismaService } from './prisma/prisma.service';
 import { RateLimitMiddleware } from './common/middleware/rate-limit.middleware';
 import { SecurityHeadersMiddleware } from './common/middleware/security-headers.middleware';
@@ -19,6 +21,7 @@ import { ValidationLoggingInterceptor } from './common/interceptors/validation-l
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true }),
+    ScheduleModule.forRoot(),
     ThrottlerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -45,6 +48,7 @@ import { ValidationLoggingInterceptor } from './common/interceptors/validation-l
     AudioAnalysisModule,
     UserModule,
     AuthModule,
+    OrganizationModule,
   ],
   controllers: [AppController],
   providers: [

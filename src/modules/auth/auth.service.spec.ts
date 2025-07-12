@@ -15,6 +15,8 @@ import { AuthResponseDto } from './dto/auth-response.dto';
 import { JwtPayload } from './types/auth.types';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserResponseDto } from '../user/dto/user-response.dto';
+import { SecurityLoggerService } from '../../common/services/security-logger.service';
+import { UserRole } from '../user/types/user.types';
 
 describe('AuthService', () => {
   let authService: AuthService;
@@ -28,6 +30,8 @@ describe('AuthService', () => {
     email: 'test@example.com',
     fullName: 'Test User',
     password: 'hashedpassword123',
+    organizationId: 'org-123',
+    role: 'ADMIN' as UserRole,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -63,6 +67,16 @@ describe('AuthService', () => {
       },
     };
 
+    const mockSecurityLoggerService = {
+      logSuccessfulRegistration: jest.fn(),
+      logFailedRegistration: jest.fn(),
+      logSuccessfulLogin: jest.fn(),
+      logFailedLogin: jest.fn(),
+      logAccountLocked: jest.fn(),
+      logTokenValidationSuccess: jest.fn(),
+      logTokenValidationFailure: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
@@ -81,6 +95,10 @@ describe('AuthService', () => {
         {
           provide: PrismaService,
           useValue: mockPrismaService,
+        },
+        {
+          provide: SecurityLoggerService,
+          useValue: mockSecurityLoggerService,
         },
       ],
     }).compile();
@@ -118,18 +136,22 @@ describe('AuthService', () => {
         email: registerDto.email,
         password: registerDto.password,
         fullName: registerDto.fullName,
+        organizationId: 'default-org-id',
+        role: 'ADMIN',
       });
 
       expect(jwtService.signAsync).toHaveBeenCalledWith({
         sub: mockUser.id,
         username: mockUser.username,
         email: mockUser.email,
+        organizationId: mockUser.organizationId,
+        role: mockUser.role,
       });
 
       expect(result).toBeInstanceOf(AuthResponseDto);
-      expect(result.accessToken).toBe(mockAccessToken);
-      expect(result.expiresIn).toBe(mockExpiresIn);
-      expect(result.user).toBeDefined();
+      expect(result.data.token).toBe(mockAccessToken);
+      expect(result.data.expiresIn).toBe(mockExpiresIn);
+      expect(result.data.user).toBeDefined();
     });
 
     it('should throw ConflictException when user already exists', async () => {
@@ -187,12 +209,14 @@ describe('AuthService', () => {
         sub: mockUser.id,
         username: mockUser.username,
         email: mockUser.email,
+        organizationId: mockUser.organizationId,
+        role: mockUser.role,
       });
 
       expect(result).toBeInstanceOf(AuthResponseDto);
-      expect(result.accessToken).toBe(mockAccessToken);
-      expect(result.expiresIn).toBe(mockExpiresIn);
-      expect(result.user).toBeInstanceOf(UserResponseDto);
+      expect(result.data.token).toBe(mockAccessToken);
+      expect(result.data.expiresIn).toBe(mockExpiresIn);
+      expect(result.data.user).toBeInstanceOf(UserResponseDto);
     });
 
     it('should successfully login with username', async () => {
@@ -272,9 +296,7 @@ describe('AuthService', () => {
         throw new Error('Logout failed');
       });
 
-      await expect(authService.logout(userId)).rejects.toThrow(
-        InternalServerErrorException,
-      );
+      await expect(authService.logout(userId)).rejects.toThrow('Logout failed');
 
       consoleSpy.mockRestore();
     });
@@ -285,6 +307,8 @@ describe('AuthService', () => {
       sub: '123e4567-e89b-12d3-a456-426614174000',
       username: 'testuser',
       email: 'test@example.com',
+      organizationId: 'org-123',
+      role: 'ADMIN' as UserRole,
     };
 
     it('should return user when valid payload is provided', async () => {
@@ -356,6 +380,7 @@ describe('AuthService', () => {
 
       const result = authService['getTokenExpirationTime']();
 
+      // The method should return 86400 for invalid input that can't be parsed
       expect(result).toBe(86400); // Default 24 hours
     });
 
@@ -365,6 +390,119 @@ describe('AuthService', () => {
       const result = authService['getTokenExpirationTime']();
 
       expect(result).toBe(86400); // Default 24 hours
+    });
+  });
+
+  describe('JWT Organization Context', () => {
+    it('should include organizationId and role in JWT payload for registration', async () => {
+      const registerDto: RegisterDto = {
+        username: 'testuser',
+        email: 'test@example.com',
+        password: 'Password123!',
+        fullName: 'Test User',
+      };
+
+      const mockAccessToken = 'jwt-token-123';
+
+      userService.create.mockResolvedValue(mockUser);
+      jwtService.signAsync.mockResolvedValue(mockAccessToken);
+      configService.get.mockReturnValue('24h');
+
+      await authService.register(registerDto);
+
+      expect(jwtService.signAsync).toHaveBeenCalledWith({
+        sub: mockUser.id,
+        username: mockUser.username,
+        email: mockUser.email,
+        organizationId: mockUser.organizationId,
+        role: mockUser.role,
+      });
+    });
+
+    it('should include organizationId and role in JWT payload for login', async () => {
+      const loginDto: LoginDto = {
+        identifier: 'test@example.com',
+        password: 'Password123!',
+      };
+
+      const mockAccessToken = 'jwt-token-123';
+
+      userService.findByEmail.mockResolvedValue(mockUser);
+      userService.validatePassword.mockResolvedValue(true);
+      jwtService.signAsync.mockResolvedValue(mockAccessToken);
+      configService.get.mockReturnValue('24h');
+
+      await authService.login(loginDto);
+
+      expect(jwtService.signAsync).toHaveBeenCalledWith({
+        sub: mockUser.id,
+        username: mockUser.username,
+        email: mockUser.email,
+        organizationId: mockUser.organizationId,
+        role: mockUser.role,
+      });
+    });
+
+    it('should handle SUPER_OWNER role in JWT payload', async () => {
+      const superOwnerUser = {
+        ...mockUser,
+        role: 'SUPER_OWNER' as UserRole,
+      };
+
+      const loginDto: LoginDto = {
+        identifier: 'test@example.com',
+        password: 'Password123!',
+      };
+
+      const mockAccessToken = 'jwt-token-123';
+
+      userService.findByEmail.mockResolvedValue(superOwnerUser);
+      userService.validatePassword.mockResolvedValue(true);
+      jwtService.signAsync.mockResolvedValue(mockAccessToken);
+      configService.get.mockReturnValue('24h');
+
+      await authService.login(loginDto);
+
+      expect(jwtService.signAsync).toHaveBeenCalledWith({
+        sub: superOwnerUser.id,
+        username: superOwnerUser.username,
+        email: superOwnerUser.email,
+        organizationId: superOwnerUser.organizationId,
+        role: 'SUPER_OWNER' as UserRole,
+      });
+    });
+
+    it('should handle different organization roles in JWT payload', async () => {
+      const roles = ['OWNER', 'ADMIN', 'AGENT'];
+
+      for (const role of roles) {
+        const userWithRole = {
+          ...mockUser,
+          role: role as any,
+        };
+
+        const loginDto: LoginDto = {
+          identifier: 'test@example.com',
+          password: 'Password123!',
+        };
+
+        const mockAccessToken = 'jwt-token-123';
+
+        userService.findByEmail.mockResolvedValue(userWithRole);
+        userService.validatePassword.mockResolvedValue(true);
+        jwtService.signAsync.mockResolvedValue(mockAccessToken);
+        configService.get.mockReturnValue('24h');
+
+        await authService.login(loginDto);
+
+        expect(jwtService.signAsync).toHaveBeenCalledWith({
+          sub: userWithRole.id,
+          username: userWithRole.username,
+          email: userWithRole.email,
+          organizationId: userWithRole.organizationId,
+          role: role,
+        });
+      }
     });
   });
 });

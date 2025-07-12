@@ -6,6 +6,7 @@ import { UserService } from '../../user/user.service';
 import { JwtPayload } from '../types/auth.types';
 import { JwtValidationService } from '../services/jwt-validation.service';
 import { SecurityLoggerService } from '../../../common/services/security-logger.service';
+import { RequestUser } from '../../../common/types/request.types';
 
 /**
  * JWT strategy for validating JWT tokens and extracting user information
@@ -33,9 +34,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
    * Enhanced with comprehensive validation and security checks
    * @param req - Express request object (when passReqToCallback is true)
    * @param payload - JWT payload containing user information
-   * @returns User object if valid, throws UnauthorizedException if invalid
+   * @returns User object with organization context if valid, throws UnauthorizedException if invalid
    */
-  async validate(req: any, payload: JwtPayload) {
+  async validate(req: any, payload: JwtPayload): Promise<RequestUser> {
     try {
       // Perform enhanced token validation
       const authHeader = req.headers.authorization;
@@ -92,6 +93,21 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         throw new UnauthorizedException('Token username mismatch');
       }
 
+      // Validate organization context from JWT payload
+      if (!payload.organizationId) {
+        console.error(
+          `[JWT STRATEGY] Missing organizationId in token for user: ${payload.sub}`,
+        );
+        throw new UnauthorizedException('Token missing organization context');
+      }
+
+      if (!payload.role) {
+        console.error(
+          `[JWT STRATEGY] Missing role in token for user: ${payload.sub}`,
+        );
+        throw new UnauthorizedException('Token missing role information');
+      }
+
       console.log(
         `[JWT STRATEGY] Successfully validated token for user: ${user.id}`,
       );
@@ -106,12 +122,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         req.method || 'unknown',
       );
 
-      // Return user object that will be attached to request.user
+      // Return user object with organization context that will be attached to request.user
       return {
         id: user.id,
         username: user.username,
         email: user.email,
         fullName: user.fullName,
+        organizationId: payload.organizationId,
+        role: payload.role,
       };
     } catch (error) {
       console.error(`[JWT STRATEGY] Token validation failed: ${error.message}`);

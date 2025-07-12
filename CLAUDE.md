@@ -7,10 +7,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - ASK FOR CLARIFICATION If you are uncertain of any of thing within the document.
 - DO NOT edit more code than you have to.
 - DO NOT WASTE TOKENS, be succinct and concise.
+- ALWAYS USE MCPS WHERE APPLICABLE.
 
 ## MCP Servers
 - Use Context7 when needing documentation beyond training cutoff
-- Use Serena for Context Management and Searching Through Code
+- Use Serena for Context Management and Searching Through Code, specially when debugging.
 
 ## Project Overview
 

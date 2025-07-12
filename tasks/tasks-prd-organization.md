@@ -1,0 +1,151 @@
+## Relevant Files
+
+- `prisma/schema.prisma` - Database schema file that needs Organization model and relationship updates
+- `src/modules/organization/organization.module.ts` - New module for organization management
+- `src/modules/organization/organization.controller.ts` - Controller for organization CRUD operations
+- `src/modules/organization/organization.controller.spec.ts` - Unit tests for organization controller
+- `src/modules/organization/organization.service.ts` - Service layer for organization business logic
+- `src/modules/organization/organization.service.spec.ts` - Unit tests for organization service
+- `src/modules/organization/dto/create-organization.dto.ts` - DTO for creating organizations
+- `src/modules/organization/dto/update-organization.dto.ts` - DTO for updating organizations
+- `src/modules/organization/dto/organization-response.dto.ts` - DTO for organization API responses
+- `src/modules/organization/entities/organization.entity.ts` - Organization entity definition
+- `src/modules/organization/types/organization.types.ts` - Organization interfaces and types
+- `src/common/guards/organization.guard.ts` - Guard for organization-based access control (created)
+- `src/common/guards/organization.guard.spec.ts` - Unit tests for organization guard (created)
+- `src/common/guards/roles.guard.ts` - Guard for role-based access control (created)
+- `src/common/guards/roles.guard.spec.ts` - Unit tests for roles guard (created)
+- `src/common/decorators/roles.decorator.ts` - Decorator for role-based authorization (created)
+- `src/common/decorators/current-user.decorator.ts` - Update to include organization context (updated)
+- `src/common/decorators/organization.decorator.ts` - New decorator to extract organization from request (created)
+- `src/common/types/request.types.ts` - Request types with organization context (created)
+- `src/modules/auth/types/auth.types.ts` - Update JWT payload interface
+- `src/modules/auth/auth.service.ts` - Update authentication to include organization (updated)
+- `src/modules/auth/auth.service.spec.ts` - Update auth service tests (updated)
+- `src/modules/auth/strategies/jwt.strategy.ts` - Update JWT strategy for organization (updated)
+- `src/modules/auth/dto/auth-response.dto.ts` - Update auth response to include organization (updated)
+- `src/modules/user/user.service.ts` - Update user service for organization context (updated)
+- `src/modules/user/user.service.spec.ts` - Update user service tests
+- `src/modules/user/types/user.types.ts` - Update user types to include organization (updated)
+- `src/modules/user/entities/user.entity.ts` - Update user entity with organization fields (updated)
+- `src/modules/storage/storage.service.ts` - Update storage service for organization filtering (updated)
+- `src/modules/storage/storage.service.spec.ts` - Update storage service tests
+- `src/modules/storage/storage.controller.ts` - Update controller for organization context (created)
+- `src/modules/jobs/jobs.service.ts` - Update jobs service for organization filtering (updated)
+- `src/modules/jobs/jobs.service.spec.ts` - Update jobs service tests
+- `src/modules/audio-analysis/audio-analysis.service.ts` - Update audio analysis for organization (updated)
+- `src/modules/audio-analysis/analysis-results.service.ts` - Update analysis results service for organization (updated)
+- `src/modules/audio-analysis/audio-analysis.controller.ts` - Update audio analysis controller for organization (updated)
+- `src/modules/audio-analysis/audio-analysis-webhook.controller.ts` - Separate webhook controller without guards (created)
+- `src/modules/audio-analysis/audio-analysis.module.ts` - Updated to include both controllers (updated)
+- `src/modules/audio-analysis/audio-analysis.service.spec.ts` - Update audio analysis tests
+- `src/app.module.ts` - Register new organization module
+- `src/common/middleware/subdomain.middleware.ts` - New middleware to extract subdomain (created)
+- `src/common/middleware/subdomain.middleware.spec.ts` - Tests for subdomain middleware (created)
+- `src/modules/organization/constants/organization.constants.ts` - Organization configuration constants with default limits (created)
+- `src/modules/organization/exceptions/organization-limits.exception.ts` - Custom exceptions for organization limit scenarios (created)
+- `src/modules/organization/dto/add-user-to-organization.dto.ts` - DTO for adding users to organizations by Super Owner (created)
+- `src/modules/organization/jobs/organization-cleanup.job.ts` - Scheduled job for permanent deletion of archived organizations after retention period (created)
+- `src/app.module.ts` - Updated to import ScheduleModule for cron job support (updated)
+- `package.json` - Added @nestjs/schedule dependency for cron job functionality (updated)
+- `src/modules/organization/types/organization.types.ts` - Updated IOrganization interface to include maxUsers, maxConcurrentJobs, and archivedAt fields (updated)
+- `src/modules/organization/organization.service.spec.ts` - Added comprehensive tests for archival functionality and updated existing tests for new behavior (updated)
+- `test/organization.e2e-spec.ts` - Comprehensive integration tests for complete organization creation flow, validation, error handling, and data consistency (created)
+- `test/data-isolation.e2e-spec.ts` - Integration tests for cross-organization data isolation, verifying users, storage, jobs, and analysis results are properly isolated by organization (created)
+- `test/subdomain-routing.e2e-spec.ts` - Integration tests for subdomain-based organization resolution, testing subdomain header processing, organization context resolution, and multi-tenant routing scenarios (created)
+- `test/organization-limits.e2e-spec.ts` - Integration tests for organization limits enforcement, verifying user and concurrent job limits across different organization configurations (created)
+- `docs/organization-migration-strategy.md` - Comprehensive migration strategy documentation for future organization features (created)
+
+### Notes
+
+- Unit tests should typically be placed alongside the code files they are testing (e.g., `organization.controller.ts` and `organization.controller.spec.ts` in the same directory).
+- Add necessary unit tests and integration tests for each Parent Task.
+- Use `pnpm run test` to run tests. Running without a path executes all tests found by the Jest configuration.
+- Ensure all database migrations are properly tested before deployment.
+- Consider implementing integration tests for cross-module interactions.
+- All services should validate organizationId in every query to prevent data leaks.
+- Role-based access should be enforced at both controller and service levels.
+
+## Tasks
+
+- [x] 1.0 Update Database Schema and Models
+  - [x] 1.1 Add UserRole enum to Prisma schema with values: SUPER_OWNER, OWNER, ADMIN, AGENT @prisma/schema.prisma
+  - [x] 1.2 Create Organization model with fields: id (UUID), name, contactNumber, email (unique), totalMemberCount, createdAt, updatedAt @prisma/schema.prisma
+  - [x] 1.3 Add organizationId and role fields to User model, create relation to Organization @prisma/schema.prisma
+  - [x] 1.4 Add organizationId field to Storage model with foreign key relation @prisma/schema.prisma
+  - [x] 1.5 Add organizationId field to Job model with foreign key relation @prisma/schema.prisma
+  - [x] 1.6 Add organizationId field to AnalysisResult model with foreign key relation @prisma/schema.prisma
+  - [x] 1.7 Add indexes on organizationId for all updated models and composite indexes where needed @prisma/schema.prisma
+  - [x] 1.8 Generate Prisma client with new schema changes using `npx prisma generate`
+  - [x] 1.9 Create and test database migration using `npx prisma migrate dev`
+
+- [x] 2.0 Create Organization Module Infrastructure
+  - [x] 2.1 Create organization module structure and register in app.module.ts @src/modules/organization/organization.module.ts @src/app.module.ts
+  - [x] 2.2 Define organization interfaces and types (IOrganization, ICreateOrganization, IUpdateOrganization, IOrganizationService) @src/modules/organization/types/organization.types.ts
+  - [x] 2.3 Create organization entity class matching Prisma model @src/modules/organization/entities/organization.entity.ts
+  - [x] 2.4 Create DTOs: CreateOrganizationDto with validation for name, email, contactNumber @src/modules/organization/dto/create-organization.dto.ts
+  - [x] 2.5 Create UpdateOrganizationDto using PartialType from CreateOrganizationDto @src/modules/organization/dto/update-organization.dto.ts
+  - [x] 2.6 Create OrganizationResponseDto excluding sensitive fields @src/modules/organization/dto/organization-response.dto.ts
+  - [x] 2.7 Implement OrganizationService with CRUD operations and member count management @src/modules/organization/organization.service.ts @src/prisma/prisma.service.ts
+  - [x] 2.8 Implement OrganizationController with endpoints: POST /organizations (SUPER_OWNER only), GET /organizations (with filtering), GET /organizations/:id, PATCH /organizations/:id, DELETE /organizations/:id @src/modules/organization/organization.controller.ts
+  - [x] 2.9 Add comprehensive unit tests for OrganizationService covering all CRUD operations and edge cases @src/modules/organization/organization.service.spec.ts
+  - [x] 2.10 Add unit tests for OrganizationController including role-based access tests @src/modules/organization/organization.controller.spec.ts
+
+- [x] 3.0 Implement Authentication and Authorization Updates
+  - [x] 3.1 Update JwtPayload interface to include organizationId and role fields @src/modules/auth/types/auth.types.ts
+  - [x] 3.2 Create Roles decorator for endpoint authorization @src/common/decorators/roles.decorator.ts
+  - [x] 3.3 Create Organization decorator to extract organizationId from request @src/common/decorators/organization.decorator.ts
+  - [x] 3.4 Update CurrentUser decorator to include organization context in returned user data @src/common/decorators/current-user.decorator.ts @src/common/types/request.types.ts
+  - [x] 3.5 Implement RolesGuard to check user roles against endpoint requirements @src/common/guards/roles.guard.ts
+  - [x] 3.6 Implement OrganizationGuard to validate organization context and filter data access @src/common/guards/organization.guard.ts
+  - [x] 3.7 Create SubdomainMiddleware to extract organization subdomain from X-Organization-Subdomain header @src/common/middleware/subdomain.middleware.ts
+  - [x] 3.8 Update JWT strategy to include organizationId and role in validated payload @src/modules/auth/strategies/jwt.strategy.ts
+  - [x] 3.9 Update AuthService login method to include organizationId and role in JWT token @src/modules/auth/auth.service.ts
+  - [x] 3.10 Update AuthResponseDto to include organization information @src/modules/auth/dto/auth-response.dto.ts
+  - [x] 3.11 Add unit tests for all new guards, decorators, and middleware @src/common/guards/roles.guard.spec.ts @src/common/guards/organization.guard.spec.ts @src/common/middleware/subdomain.middleware.spec.ts
+  - [x] 3.12 Update auth service tests to verify organization context in JWT @src/modules/auth/auth.service.spec.ts
+
+- [x] 4.0 Update Existing Services for Organization Context
+  - [x] 4.1 Update User types to include organizationId and role @src/modules/user/types/user.types.ts
+  - [x] 4.2 Update User entity to match new schema with organization fields @src/modules/user/entities/user.entity.ts
+  - [x] 4.3 Modify UserService.create to accept and validate organizationId, enforce role creation rules (ADMIN can only create AGENT) @src/modules/user/user.service.ts
+  - [x] 4.4 Update UserService.findAll to filter by organizationId based on user role @src/modules/user/user.service.ts
+  - [x] 4.5 Implement user count increment/decrement in UserService when creating/deleting users @src/modules/user/user.service.ts @src/modules/organization/organization.service.ts
+  - [x] 4.6 Add validation to prevent deletion of last OWNER in organization @src/modules/user/user.service.ts
+  - [x] 4.7 Update StorageService to include organizationId in all queries and create operations @src/modules/storage/storage.service.ts
+  - [x] 4.8 Update StorageController to use OrganizationGuard and validate organization context @src/modules/storage/storage.controller.ts
+  - [x] 4.9 Update JobsService to filter jobs by organizationId and enforce concurrent job limits @src/modules/jobs/jobs.service.ts
+  - [x] 4.10 Update AudioAnalysisService to include organizationId in all operations @src/modules/audio-analysis/audio-analysis.service.ts
+  - [x] 4.11 Add organizationId validation to all service methods to prevent cross-organization data access @src/modules/storage/storage.service.ts @src/modules/jobs/jobs.service.ts @src/modules/audio-analysis/audio-analysis.service.ts
+  - [x] 4.12 Update all service tests to include organization context and test data isolation @src/modules/user/user.service.spec.ts @src/modules/storage/storage.service.spec.ts @src/modules/jobs/jobs.service.spec.ts @src/modules/audio-analysis/audio-analysis.service.spec.ts
+
+- [x] 5.0 Implement Organization Limits and Constraints
+  - [x] 5.1 Add maxUsers and maxConcurrentJobs fields to Organization model @prisma/schema.prisma
+  - [x] 5.2 Create organization configuration constants with default limits @src/modules/organization/constants/organization.constants.ts
+  - [x] 5.3 Implement user limit validation in UserService.create method @src/modules/user/user.service.ts
+  - [x] 5.4 Implement concurrent job limit validation in JobsService @src/modules/jobs/jobs.service.ts
+  - [x] 5.5 Create custom exceptions for limit exceeded scenarios @src/modules/organization/exceptions/organization-limits.exception.ts
+  - [x] 5.6 Add unit tests for limit enforcement in user and job creation @src/modules/user/user.service.spec.ts @src/modules/jobs/jobs.service.spec.ts
+
+- [x] 6.0 Create Super Owner Management Endpoints
+  - [x] 6.1 Create endpoint POST /organizations/:id/users for Super Owner to add first Owner @src/modules/organization/organization.controller.ts
+  - [x] 6.2 Implement Super Owner bypass in OrganizationGuard for cross-organization access @src/common/guards/organization.guard.ts
+  - [x] 6.3 Create endpoint GET /admin/organizations for Super Owner to list all organizations @src/modules/organization/organization.controller.ts
+  - [x] 6.4 Implement organization switching logic for users with access to multiple orgs @src/modules/auth/auth.service.ts
+  - [x] 6.5 Add tests for Super Owner specific functionality @src/modules/organization/organization.controller.spec.ts
+
+- [x] 7.0 Implement Data Archival for Organization Deletion
+  - [x] 7.1 Add archivedAt nullable timestamp field to Organization model @prisma/schema.prisma
+  - [x] 7.2 Implement soft delete in OrganizationService.remove method @src/modules/organization/organization.service.ts
+  - [x] 7.3 Update all queries to exclude archived organizations by default @src/modules/organization/organization.service.ts
+  - [x] 7.4 Create scheduled job for permanent deletion after retention period @src/modules/organization/jobs/organization-cleanup.job.ts
+  - [x] 7.5 Add tests for archival and restoration functionality @src/modules/organization/organization.service.spec.ts
+
+- [x] 8.0 Integration Testing and Documentation
+  - [x] 8.1 Create integration tests for complete organization creation flow @test/organization.e2e-spec.ts
+  - [x] 8.2 Create integration tests for cross-organization data isolation @test/data-isolation.e2e-spec.ts
+  - [x] 8.3 Test subdomain-based organization resolution @test/subdomain-routing.e2e-spec.ts
+  - [x] 8.4 Create integration tests for organization limits enforcement @test/organization-limits.e2e-spec.ts
+  - [x] 8.5 Update API documentation with organization endpoints and examples
+  - [x] 8.6 Create postman collection for organization management endpoints
+  - [x] 8.7 Document migration strategy for future organization features

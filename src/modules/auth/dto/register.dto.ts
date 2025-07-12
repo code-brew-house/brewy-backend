@@ -67,9 +67,9 @@ export class RegisterDto {
   )
   @MinLength(2, { message: 'Full name must be at least 2 characters long' })
   @MaxLength(100, { message: 'Full name must not exceed 100 characters' })
-  @Matches(/^[a-zA-Z0-9\u00c0-\u00ff\s'-]+$/, {
+  @Matches(/^[a-zA-ZÀ-ÿ\s'-]+$/, {
     message:
-      'Full name can only contain letters, numbers, spaces, apostrophes, and hyphens',
+      'Full name can only contain letters, spaces, apostrophes, and hyphens',
   })
   @Matches(/^[a-zA-Z]/, {
     message: 'Full name must start with a letter',

@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { AudioAnalysisService } from './audio-analysis.service';
 import { AnalysisResultsService } from './analysis-results.service';
 import { AudioAnalysisController } from './audio-analysis.controller';
+import { AudioAnalysisWebhookController } from './audio-analysis-webhook.controller';
 import { StorageModule } from '../storage/storage.module';
 import { JobsModule } from '../jobs/jobs.module';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -14,7 +15,7 @@ import { N8NWebhookService } from './n8n-webhook.service';
  */
 @Module({
   imports: [ConfigModule, StorageModule, JobsModule],
-  controllers: [AudioAnalysisController],
+  controllers: [AudioAnalysisController, AudioAnalysisWebhookController],
   providers: [
     AudioAnalysisService,
     AnalysisResultsService,

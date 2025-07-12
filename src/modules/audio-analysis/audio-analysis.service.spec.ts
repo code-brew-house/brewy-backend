@@ -4,6 +4,7 @@ import { StorageService } from '../storage/storage.service';
 import { JobsService } from '../jobs/jobs.service';
 import { AnalysisResultsService } from './analysis-results.service';
 import { N8NWebhookService } from './n8n-webhook.service';
+import { PrismaService } from '../../prisma/prisma.service';
 import { BadRequestException } from '@nestjs/common';
 import { JobStatus } from '../../../generated/prisma';
 
@@ -17,6 +18,7 @@ describe('AudioAnalysisService', () => {
   const mockJobsService = {
     create: jest.fn(),
     findById: jest.fn(),
+    findJobById: jest.fn(),
     updateStatus: jest.fn(),
   };
 
@@ -27,6 +29,15 @@ describe('AudioAnalysisService', () => {
 
   const mockN8NWebhookService = {
     triggerWebhook: jest.fn(),
+  };
+
+  const mockPrismaService = {
+    job: {
+      findUnique: jest.fn(),
+    },
+    analysisResult: {
+      findFirst: jest.fn(),
+    },
   };
 
   beforeEach(async () => {
@@ -49,6 +60,10 @@ describe('AudioAnalysisService', () => {
           provide: N8NWebhookService,
           useValue: mockN8NWebhookService,
         },
+        {
+          provide: PrismaService,
+          useValue: mockPrismaService,
+        },
       ],
     }).compile();
 
@@ -58,6 +73,11 @@ describe('AudioAnalysisService', () => {
   afterEach(() => {
     jest.clearAllMocks();
   });
+
+  const mockOrganization = {
+    id: 'org-123e4567-e89b-12d3-a456-426614174000',
+    name: 'Test Organization',
+  };
 
   describe('uploadAndProcess', () => {
     const mockFile = {
@@ -79,6 +99,7 @@ describe('AudioAnalysisService', () => {
       id: 'job-id',
       fileId: 'storage-id',
       status: JobStatus.pending,
+      organizationId: 'org-123e4567-e89b-12d3-a456-426614174000',
       createdAt: new Date(),
       updatedAt: new Date(),
     };
@@ -90,10 +111,19 @@ describe('AudioAnalysisService', () => {
     });
 
     it('should successfully upload file and trigger N8N webhook', async () => {
-      const result = await service.uploadAndProcess(mockFile);
+      const result = await service.uploadAndProcess(
+        mockFile,
+        mockOrganization.id,
+      );
 
-      expect(mockStorageService.uploadFile).toHaveBeenCalledWith(mockFile);
-      expect(mockJobsService.create).toHaveBeenCalledWith(mockStorageRecord.id);
+      expect(mockStorageService.uploadFile).toHaveBeenCalledWith(
+        mockFile,
+        mockOrganization.id,
+      );
+      expect(mockJobsService.create).toHaveBeenCalledWith(
+        mockStorageRecord.id,
+        mockOrganization.id,
+      );
       expect(mockN8NWebhookService.triggerWebhook).toHaveBeenCalledWith({
         jobId: mockJob.id,
         fileUrl: mockStorageRecord.url,
@@ -112,16 +142,26 @@ describe('AudioAnalysisService', () => {
     });
 
     it('should throw BadRequestException when file is null', async () => {
-      await expect(service.uploadAndProcess(null as any)).rejects.toThrow(
-        new BadRequestException('File is required'),
+      await expect(
+        service.uploadAndProcess(null as any, mockOrganization.id),
+      ).rejects.toThrow(new BadRequestException('File is required'));
+    });
+
+    it('should throw BadRequestException when organization ID is missing', async () => {
+      mockStorageService.uploadFile.mockRejectedValue(
+        new BadRequestException('Organization ID is required'),
+      );
+
+      await expect(service.uploadAndProcess(mockFile, '')).rejects.toThrow(
+        BadRequestException,
       );
     });
 
     it('should throw BadRequestException when file is empty', async () => {
       const emptyFile = { ...mockFile, size: 0 };
-      await expect(service.uploadAndProcess(emptyFile)).rejects.toThrow(
-        new BadRequestException('File is empty'),
-      );
+      await expect(
+        service.uploadAndProcess(emptyFile, mockOrganization.id),
+      ).rejects.toThrow(new BadRequestException('File is empty'));
     });
 
     it('should throw BadRequestException for non-MP3 files', async () => {
@@ -130,9 +170,9 @@ describe('AudioAnalysisService', () => {
         originalname: 'test.wav',
         mimetype: 'audio/wav',
       };
-      await expect(service.uploadAndProcess(nonMp3File)).rejects.toThrow(
-        new BadRequestException('Only MP3 files are allowed'),
-      );
+      await expect(
+        service.uploadAndProcess(nonMp3File, mockOrganization.id),
+      ).rejects.toThrow(new BadRequestException('Only MP3 files are allowed'));
     });
 
     it('should throw BadRequestException for files larger than 20MB', async () => {
@@ -140,7 +180,9 @@ describe('AudioAnalysisService', () => {
         ...mockFile,
         size: 21 * 1024 * 1024, // 21MB
       };
-      await expect(service.uploadAndProcess(largeFile)).rejects.toThrow(
+      await expect(
+        service.uploadAndProcess(largeFile, mockOrganization.id),
+      ).rejects.toThrow(
         new BadRequestException('File size must be 20MB or less'),
       );
     });
@@ -151,9 +193,15 @@ describe('AudioAnalysisService', () => {
         size: 20 * 1024 * 1024, // Exactly 20MB
       };
 
-      const result = await service.uploadAndProcess(maxSizeFile);
+      const result = await service.uploadAndProcess(
+        maxSizeFile,
+        mockOrganization.id,
+      );
 
-      expect(mockStorageService.uploadFile).toHaveBeenCalledWith(maxSizeFile);
+      expect(mockStorageService.uploadFile).toHaveBeenCalledWith(
+        maxSizeFile,
+        mockOrganization.id,
+      );
       expect(result).toEqual({
         jobId: mockJob.id,
         fileId: mockStorageRecord.id,
@@ -168,10 +216,14 @@ describe('AudioAnalysisService', () => {
         mimetype: 'audio/mp3',
       };
 
-      const result = await service.uploadAndProcess(alternativeMimeFile);
+      const result = await service.uploadAndProcess(
+        alternativeMimeFile,
+        mockOrganization.id,
+      );
 
       expect(mockStorageService.uploadFile).toHaveBeenCalledWith(
         alternativeMimeFile,
+        mockOrganization.id,
       );
       expect(result).toEqual({
         jobId: mockJob.id,
@@ -188,10 +240,14 @@ describe('AudioAnalysisService', () => {
         originalname: 'test.mp3',
       };
 
-      const result = await service.uploadAndProcess(octetStreamFile);
+      const result = await service.uploadAndProcess(
+        octetStreamFile,
+        mockOrganization.id,
+      );
 
       expect(mockStorageService.uploadFile).toHaveBeenCalledWith(
         octetStreamFile,
+        mockOrganization.id,
       );
       expect(result).toEqual({
         jobId: mockJob.id,
@@ -208,10 +264,14 @@ describe('AudioAnalysisService', () => {
         mimetype: 'audio/mpeg',
       };
 
-      const result = await service.uploadAndProcess(wrongExtensionFile);
+      const result = await service.uploadAndProcess(
+        wrongExtensionFile,
+        mockOrganization.id,
+      );
 
       expect(mockStorageService.uploadFile).toHaveBeenCalledWith(
         wrongExtensionFile,
+        mockOrganization.id,
       );
       expect(result).toEqual({
         jobId: mockJob.id,
@@ -228,9 +288,9 @@ describe('AudioAnalysisService', () => {
         mimetype: 'audio/wav',
       };
 
-      await expect(service.uploadAndProcess(invalidFile)).rejects.toThrow(
-        new BadRequestException('Only MP3 files are allowed'),
-      );
+      await expect(
+        service.uploadAndProcess(invalidFile, 'test-org-id'),
+      ).rejects.toThrow(new BadRequestException('Only MP3 files are allowed'));
     });
 
     it('should handle N8N webhook failure and update job status to failed', async () => {
@@ -238,7 +298,9 @@ describe('AudioAnalysisService', () => {
         new Error('Network error'),
       );
 
-      await expect(service.uploadAndProcess(mockFile)).rejects.toThrow(
+      await expect(
+        service.uploadAndProcess(mockFile, 'test-org-id'),
+      ).rejects.toThrow(
         new BadRequestException('Failed to trigger processing workflow'),
       );
 
@@ -254,9 +316,9 @@ describe('AudioAnalysisService', () => {
         new Error('Storage unavailable'),
       );
 
-      await expect(service.uploadAndProcess(mockFile)).rejects.toThrow(
-        'Storage unavailable',
-      );
+      await expect(
+        service.uploadAndProcess(mockFile, 'test-org-id'),
+      ).rejects.toThrow('Storage unavailable');
     });
 
     it('should handle job creation failure', async () => {
@@ -264,9 +326,9 @@ describe('AudioAnalysisService', () => {
         new Error('Database connection failed'),
       );
 
-      await expect(service.uploadAndProcess(mockFile)).rejects.toThrow(
-        'Database connection failed',
-      );
+      await expect(
+        service.uploadAndProcess(mockFile, 'test-org-id'),
+      ).rejects.toThrow('Database connection failed');
     });
 
     it('should handle extremely large metadata', async () => {
@@ -274,10 +336,14 @@ describe('AudioAnalysisService', () => {
       const fileWithLargeMetadata = { ...mockFile, metadata: largeMetadata };
 
       // Should still process normally
-      const result = await service.uploadAndProcess(fileWithLargeMetadata);
+      const result = await service.uploadAndProcess(
+        fileWithLargeMetadata,
+        'test-org-id',
+      );
 
       expect(mockStorageService.uploadFile).toHaveBeenCalledWith(
         fileWithLargeMetadata,
+        'test-org-id',
       );
       expect(result).toEqual({
         jobId: mockJob.id,
@@ -294,9 +360,9 @@ describe('AudioAnalysisService', () => {
         mimetype: 'audio/wav', // Also change mimetype so validation fails
       };
 
-      await expect(service.uploadAndProcess(fileWithNullName)).rejects.toThrow(
-        new BadRequestException('Only MP3 files are allowed'),
-      );
+      await expect(
+        service.uploadAndProcess(fileWithNullName, 'test-org-id'),
+      ).rejects.toThrow(new BadRequestException('Only MP3 files are allowed'));
     });
 
     it('should handle file with empty originalname', async () => {
@@ -306,14 +372,14 @@ describe('AudioAnalysisService', () => {
         mimetype: 'audio/wav', // Also change mimetype so validation fails
       };
 
-      await expect(service.uploadAndProcess(fileWithEmptyName)).rejects.toThrow(
-        new BadRequestException('Only MP3 files are allowed'),
-      );
+      await expect(
+        service.uploadAndProcess(fileWithEmptyName, 'test-org-id'),
+      ).rejects.toThrow(new BadRequestException('Only MP3 files are allowed'));
     });
   });
 
   describe('getJobStatus', () => {
-    it('should return formatted job status', async () => {
+    it('should return formatted job status with organization validation', async () => {
       const mockJob = {
         id: 'job-id',
         status: JobStatus.completed,
@@ -332,9 +398,12 @@ describe('AudioAnalysisService', () => {
 
       mockJobsService.findById.mockResolvedValue(mockJob);
 
-      const result = await service.getJobStatus('job-id');
+      const result = await service.getJobStatus('job-id', mockOrganization.id);
 
-      expect(mockJobsService.findById).toHaveBeenCalledWith('job-id');
+      expect(mockJobsService.findById).toHaveBeenCalledWith(
+        'job-id',
+        mockOrganization.id,
+      );
       expect(result).toEqual({
         id: mockJob.id,
         status: mockJob.status,
@@ -351,10 +420,18 @@ describe('AudioAnalysisService', () => {
         },
       });
     });
+
+    it('should throw BadRequestException when organization ID is missing', async () => {
+      mockJobsService.findById.mockResolvedValue(null);
+
+      await expect(service.getJobStatus('job-id', '')).rejects.toThrow(
+        'Job with ID job-id not found',
+      );
+    });
   });
 
   describe('getAnalysisResults', () => {
-    it('should return formatted analysis results', async () => {
+    it('should return formatted analysis results with organization validation', async () => {
       const mockResult = {
         id: 'result-id',
         jobId: 'job-id',
@@ -374,10 +451,14 @@ describe('AudioAnalysisService', () => {
 
       mockAnalysisResultsService.findByJobId.mockResolvedValue(mockResult);
 
-      const result = await service.getAnalysisResults('job-id');
+      const result = await service.getAnalysisResults(
+        'job-id',
+        mockOrganization.id,
+      );
 
       expect(mockAnalysisResultsService.findByJobId).toHaveBeenCalledWith(
         'job-id',
+        mockOrganization.id,
       );
       expect(result).toEqual({
         id: mockResult.id,
@@ -396,17 +477,26 @@ describe('AudioAnalysisService', () => {
         },
       });
     });
+
+    it('should throw BadRequestException when organization ID is missing', async () => {
+      mockAnalysisResultsService.findByJobId.mockResolvedValue(null);
+
+      await expect(service.getAnalysisResults('job-id', '')).rejects.toThrow(
+        'Analysis results for job job-id not found',
+      );
+    });
   });
 
   describe('processWebhookCallback', () => {
     const mockJob = {
       id: 'job-id',
       status: JobStatus.processing,
+      organizationId: 'org-123e4567-e89b-12d3-a456-426614174000',
       storage: { filename: 'test.mp3' },
     };
 
     beforeEach(() => {
-      mockJobsService.findById.mockResolvedValue(mockJob);
+      mockJobsService.findJobById.mockResolvedValue(mockJob);
     });
 
     it('should process completed webhook callback', async () => {
@@ -424,12 +514,13 @@ describe('AudioAnalysisService', () => {
 
       const result = await service.processWebhookCallback(callbackData);
 
-      expect(mockJobsService.findById).toHaveBeenCalledWith('job-id');
+      expect(mockJobsService.findJobById).toHaveBeenCalledWith('job-id');
       expect(mockAnalysisResultsService.create).toHaveBeenCalledWith({
         jobId: callbackData.jobId,
         transcript: callbackData.transcript,
         sentiment: callbackData.sentiment,
         metadata: callbackData.metadata,
+        organizationId: mockJob.organizationId,
       });
       expect(mockJobsService.updateStatus).toHaveBeenCalledWith(
         callbackData.jobId,
@@ -447,7 +538,7 @@ describe('AudioAnalysisService', () => {
 
       const result = await service.processWebhookCallback(callbackData);
 
-      expect(mockJobsService.findById).toHaveBeenCalledWith('job-id');
+      expect(mockJobsService.findJobById).toHaveBeenCalledWith('job-id');
       expect(mockAnalysisResultsService.create).not.toHaveBeenCalled();
       expect(mockJobsService.updateStatus).toHaveBeenCalledWith(
         callbackData.jobId,
@@ -503,7 +594,7 @@ describe('AudioAnalysisService', () => {
     });
 
     it('should fail when job is not found', async () => {
-      mockJobsService.findById.mockResolvedValue(null);
+      mockJobsService.findJobById.mockResolvedValue(null);
 
       const callbackData = {
         jobId: 'nonexistent-job-id',
@@ -580,6 +671,7 @@ describe('AudioAnalysisService', () => {
         transcript: callbackData.transcript,
         sentiment: callbackData.sentiment,
         metadata: null,
+        organizationId: mockJob.organizationId,
       });
       expect(result).toEqual({ success: true });
     });
@@ -607,6 +699,7 @@ describe('AudioAnalysisService', () => {
         transcript: callbackData.transcript,
         sentiment: callbackData.sentiment,
         metadata: callbackData.metadata,
+        organizationId: mockJob.organizationId,
       });
       expect(result).toEqual({ success: true });
     });

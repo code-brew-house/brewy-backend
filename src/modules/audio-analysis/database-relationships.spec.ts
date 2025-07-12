@@ -11,6 +11,7 @@ import { ConfigService } from '@nestjs/config';
  */
 describe('Database Relationships and Constraints', () => {
   let prismaService: PrismaService;
+  let testOrganization: any;
 
   beforeAll(async () => {
     const module: TestingModule = await Test.createTestingModule({
@@ -29,6 +30,15 @@ describe('Database Relationships and Constraints', () => {
 
     // Clean up any existing test data
     await cleanupTestData();
+
+    // Create test organization
+    testOrganization = await prismaService.organization.create({
+      data: {
+        name: 'Test Organization',
+        email: 'test-db-relations@example.com',
+        contactNumber: '+1234567890',
+      },
+    });
   });
 
   afterAll(async () => {
@@ -62,6 +72,13 @@ describe('Database Relationships and Constraints', () => {
           filename: { contains: 'test-db-relationship' },
         },
       });
+
+      // Clean up test organizations
+      await prismaService.organization.deleteMany({
+        where: {
+          email: 'test-db-relations@example.com',
+        },
+      });
     } catch (error) {
       // Ignore cleanup errors in tests
     }
@@ -76,6 +93,7 @@ describe('Database Relationships and Constraints', () => {
           filename: 'test-db-relationship-1.mp3',
           size: 1024,
           mimetype: 'audio/mpeg',
+          organizationId: testOrganization.id,
         },
       });
 
@@ -84,6 +102,7 @@ describe('Database Relationships and Constraints', () => {
         data: {
           fileId: storage.id,
           status: JobStatus.pending,
+          organizationId: testOrganization.id,
         },
       });
 
@@ -108,6 +127,7 @@ describe('Database Relationships and Constraints', () => {
           data: {
             fileId: invalidStorageId,
             status: JobStatus.pending,
+            organizationId: testOrganization.id,
           },
         }),
       ).rejects.toThrow();
@@ -121,6 +141,7 @@ describe('Database Relationships and Constraints', () => {
           data: {
             fileId: nonExistentId,
             status: JobStatus.pending,
+            organizationId: testOrganization.id,
           },
         }),
       ).rejects.toThrow();
@@ -133,6 +154,7 @@ describe('Database Relationships and Constraints', () => {
           filename: 'test-db-relationship-multiple.mp3',
           size: 2048,
           mimetype: 'audio/mpeg',
+          organizationId: testOrganization.id,
         },
       });
 
@@ -140,6 +162,7 @@ describe('Database Relationships and Constraints', () => {
         data: {
           fileId: storage.id,
           status: JobStatus.pending,
+          organizationId: testOrganization.id,
         },
       });
 
@@ -147,6 +170,7 @@ describe('Database Relationships and Constraints', () => {
         data: {
           fileId: storage.id,
           status: JobStatus.processing,
+          organizationId: testOrganization.id,
         },
       });
 
@@ -165,6 +189,7 @@ describe('Database Relationships and Constraints', () => {
           filename: 'test-db-relationship-2.mp3',
           size: 1024,
           mimetype: 'audio/mpeg',
+          organizationId: testOrganization.id,
         },
       });
 
@@ -172,6 +197,7 @@ describe('Database Relationships and Constraints', () => {
         data: {
           fileId: storage.id,
           status: JobStatus.completed,
+          organizationId: testOrganization.id,
         },
       });
 
@@ -182,6 +208,7 @@ describe('Database Relationships and Constraints', () => {
           transcript: 'Test transcript for relationship testing',
           sentiment: 'positive',
           metadata: { confidence: 0.95, duration: 120 },
+          organizationId: testOrganization.id,
         },
       });
 
@@ -212,6 +239,7 @@ describe('Database Relationships and Constraints', () => {
             jobId: nonExistentJobId,
             transcript: 'Test transcript',
             sentiment: 'positive',
+            organizationId: testOrganization.id,
           },
         }),
       ).rejects.toThrow();
@@ -224,6 +252,7 @@ describe('Database Relationships and Constraints', () => {
           filename: 'test-db-relationship-multiple-results.mp3',
           size: 1024,
           mimetype: 'audio/mpeg',
+          organizationId: testOrganization.id,
         },
       });
 
@@ -231,6 +260,7 @@ describe('Database Relationships and Constraints', () => {
         data: {
           fileId: storage.id,
           status: JobStatus.completed,
+          organizationId: testOrganization.id,
         },
       });
 
@@ -239,6 +269,7 @@ describe('Database Relationships and Constraints', () => {
           jobId: job.id,
           transcript: 'First analysis',
           sentiment: 'positive',
+          organizationId: testOrganization.id,
         },
       });
 
@@ -247,6 +278,7 @@ describe('Database Relationships and Constraints', () => {
           jobId: job.id,
           transcript: 'Second analysis',
           sentiment: 'negative',
+          organizationId: testOrganization.id,
         },
       });
 
@@ -264,6 +296,7 @@ describe('Database Relationships and Constraints', () => {
           filename: 'test-db-relationship-enum.mp3',
           size: 1024,
           mimetype: 'audio/mpeg',
+          organizationId: testOrganization.id,
         },
       });
 
@@ -279,6 +312,7 @@ describe('Database Relationships and Constraints', () => {
           data: {
             fileId: storage.id,
             status,
+            organizationId: testOrganization.id,
           },
         });
 
@@ -293,6 +327,7 @@ describe('Database Relationships and Constraints', () => {
           filename: 'test-db-relationship-default.mp3',
           size: 1024,
           mimetype: 'audio/mpeg',
+          organizationId: testOrganization.id,
         },
       });
 
@@ -300,6 +335,7 @@ describe('Database Relationships and Constraints', () => {
         data: {
           fileId: storage.id,
           // Not specifying status to test default
+          organizationId: testOrganization.id,
         },
       });
 
@@ -328,6 +364,7 @@ describe('Database Relationships and Constraints', () => {
           filename: 'test-db-relationship-required.mp3',
           size: 1024,
           mimetype: 'audio/mpeg',
+          organizationId: testOrganization.id,
         },
       });
 
@@ -335,6 +372,7 @@ describe('Database Relationships and Constraints', () => {
         data: {
           fileId: storage.id,
           status: JobStatus.completed,
+          organizationId: testOrganization.id,
         },
       });
 
@@ -356,6 +394,7 @@ describe('Database Relationships and Constraints', () => {
           filename: 'test-db-relationship-sentiment.mp3',
           size: 1024,
           mimetype: 'audio/mpeg',
+          organizationId: testOrganization.id,
         },
       });
 
@@ -363,6 +402,7 @@ describe('Database Relationships and Constraints', () => {
         data: {
           fileId: storage.id,
           status: JobStatus.completed,
+          organizationId: testOrganization.id,
         },
       });
 
@@ -386,6 +426,7 @@ describe('Database Relationships and Constraints', () => {
           filename: 'test-db-relationship-uuid-1.mp3',
           size: 1024,
           mimetype: 'audio/mpeg',
+          organizationId: testOrganization.id,
         },
       });
 
@@ -395,6 +436,7 @@ describe('Database Relationships and Constraints', () => {
           filename: 'test-db-relationship-uuid-2.mp3',
           size: 1024,
           mimetype: 'audio/mpeg',
+          organizationId: testOrganization.id,
         },
       });
 
@@ -414,6 +456,7 @@ describe('Database Relationships and Constraints', () => {
           filename: 'test-db-relationship-job-uuid.mp3',
           size: 1024,
           mimetype: 'audio/mpeg',
+          organizationId: testOrganization.id,
         },
       });
 
@@ -421,6 +464,7 @@ describe('Database Relationships and Constraints', () => {
         data: {
           fileId: storage.id,
           status: JobStatus.pending,
+          organizationId: testOrganization.id,
         },
       });
 
@@ -428,6 +472,7 @@ describe('Database Relationships and Constraints', () => {
         data: {
           fileId: storage.id,
           status: JobStatus.pending,
+          organizationId: testOrganization.id,
         },
       });
 
@@ -449,6 +494,7 @@ describe('Database Relationships and Constraints', () => {
           filename: 'test-db-relationship-metadata.mp3',
           size: 1024,
           mimetype: 'audio/mpeg',
+          organizationId: testOrganization.id,
         },
       });
 
@@ -456,6 +502,7 @@ describe('Database Relationships and Constraints', () => {
         data: {
           fileId: storage.id,
           status: JobStatus.completed,
+          organizationId: testOrganization.id,
         },
       });
 
@@ -484,6 +531,7 @@ describe('Database Relationships and Constraints', () => {
           transcript: 'Complex metadata test',
           sentiment: 'positive',
           metadata: complexMetadata,
+          organizationId: testOrganization.id,
         },
       });
 
@@ -497,6 +545,7 @@ describe('Database Relationships and Constraints', () => {
           filename: 'test-db-relationship-null-metadata.mp3',
           size: 1024,
           mimetype: 'audio/mpeg',
+          organizationId: testOrganization.id,
         },
       });
 
@@ -504,6 +553,7 @@ describe('Database Relationships and Constraints', () => {
         data: {
           fileId: storage.id,
           status: JobStatus.completed,
+          organizationId: testOrganization.id,
         },
       });
 
@@ -513,6 +563,7 @@ describe('Database Relationships and Constraints', () => {
           transcript: 'Null metadata test',
           sentiment: 'neutral',
           // metadata field omitted to test null default
+          organizationId: testOrganization.id,
         },
       });
 
@@ -528,6 +579,7 @@ describe('Database Relationships and Constraints', () => {
           filename: 'test-db-relationship-cascade.mp3',
           size: 1024,
           mimetype: 'audio/mpeg',
+          organizationId: testOrganization.id,
         },
       });
 
@@ -535,6 +587,7 @@ describe('Database Relationships and Constraints', () => {
         data: {
           fileId: storage.id,
           status: JobStatus.completed,
+          organizationId: testOrganization.id,
         },
       });
 
@@ -559,6 +612,7 @@ describe('Database Relationships and Constraints', () => {
           filename: 'test-db-relationship-job-cascade.mp3',
           size: 1024,
           mimetype: 'audio/mpeg',
+          organizationId: testOrganization.id,
         },
       });
 
@@ -566,6 +620,7 @@ describe('Database Relationships and Constraints', () => {
         data: {
           fileId: storage.id,
           status: JobStatus.completed,
+          organizationId: testOrganization.id,
         },
       });
 
@@ -574,6 +629,7 @@ describe('Database Relationships and Constraints', () => {
           jobId: job.id,
           transcript: 'Cascade test',
           sentiment: 'positive',
+          organizationId: testOrganization.id,
         },
       });
 
@@ -602,6 +658,7 @@ describe('Database Relationships and Constraints', () => {
           filename: 'test-db-relationship-timestamps.mp3',
           size: 1024,
           mimetype: 'audio/mpeg',
+          organizationId: testOrganization.id,
         },
       });
 
@@ -609,6 +666,7 @@ describe('Database Relationships and Constraints', () => {
         data: {
           fileId: storage.id,
           status: JobStatus.pending,
+          organizationId: testOrganization.id,
         },
       });
 
@@ -617,6 +675,7 @@ describe('Database Relationships and Constraints', () => {
           jobId: job.id,
           transcript: 'Timestamp test',
           sentiment: 'positive',
+          organizationId: testOrganization.id,
         },
       });
 
@@ -656,6 +715,7 @@ describe('Database Relationships and Constraints', () => {
           filename: 'test-db-relationship-updated-at.mp3',
           size: 1024,
           mimetype: 'audio/mpeg',
+          organizationId: testOrganization.id,
         },
       });
 
@@ -663,6 +723,7 @@ describe('Database Relationships and Constraints', () => {
         data: {
           fileId: storage.id,
           status: JobStatus.pending,
+          organizationId: testOrganization.id,
         },
       });
 

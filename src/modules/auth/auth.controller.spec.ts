@@ -29,17 +29,24 @@ describe('AuthController', () => {
     username: 'testuser',
     email: 'test@example.com',
     fullName: 'Test User',
+    organizationId: 'org-123',
+    role: 'AGENT',
     createdAt: new Date('2023-01-01'),
     updatedAt: new Date('2023-01-01'),
     password: 'should-be-excluded',
   };
 
-  const mockAuthResponse: AuthResponseDto = {
-    accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token',
-    tokenType: 'Bearer',
-    expiresIn: 86400,
-    user: mockUserResponse,
-  };
+  const mockAuthResponse = new AuthResponseDto(
+    'Login successful',
+    mockUserResponse,
+    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test.token',
+    86400,
+    {
+      id: 'org-123',
+      name: 'Test Organization',
+      role: 'AGENT',
+    },
+  );
 
   const validRegisterDto: RegisterDto = {
     username: 'testuser',
@@ -509,14 +516,17 @@ describe('AuthController', () => {
 
         const result = await controller.register(validRegisterDto, mockRequest);
 
-        expect(result).toHaveProperty('accessToken');
-        expect(result).toHaveProperty('tokenType');
-        expect(result).toHaveProperty('expiresIn');
-        expect(result).toHaveProperty('user');
-        expect(result.user).toHaveProperty('id');
-        expect(result.user).toHaveProperty('username');
-        expect(result.user).toHaveProperty('email');
-        expect(result.user).toHaveProperty('fullName');
+        expect(result).toHaveProperty('success');
+        expect(result).toHaveProperty('message');
+        expect(result).toHaveProperty('data');
+        expect(result.data).toHaveProperty('token');
+        expect(result.data).toHaveProperty('tokenType');
+        expect(result.data).toHaveProperty('expiresIn');
+        expect(result.data).toHaveProperty('user');
+        expect(result.data.user).toHaveProperty('id');
+        expect(result.data.user).toHaveProperty('username');
+        expect(result.data.user).toHaveProperty('email');
+        expect(result.data.user).toHaveProperty('fullName');
       });
 
       it('should return complete auth response object for login', async () => {
@@ -524,11 +534,14 @@ describe('AuthController', () => {
 
         const result = await controller.login(validLoginDto, mockRequest);
 
-        expect(result).toHaveProperty('accessToken');
-        expect(result).toHaveProperty('tokenType');
-        expect(result).toHaveProperty('expiresIn');
-        expect(result).toHaveProperty('user');
-        expect(result.tokenType).toBe('Bearer');
+        expect(result).toHaveProperty('success');
+        expect(result).toHaveProperty('message');
+        expect(result).toHaveProperty('data');
+        expect(result.data).toHaveProperty('token');
+        expect(result.data).toHaveProperty('tokenType');
+        expect(result.data).toHaveProperty('expiresIn');
+        expect(result.data).toHaveProperty('user');
+        expect(result.data.tokenType).toBe('Bearer');
       });
 
       it('should return proper logout response', async () => {

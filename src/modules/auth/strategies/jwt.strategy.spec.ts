@@ -6,6 +6,7 @@ import { UserService } from '../../user/user.service';
 import { JwtValidationService } from '../services/jwt-validation.service';
 import { SecurityLoggerService } from '../../../common/services/security-logger.service';
 import { JwtPayload } from '../types/auth.types';
+import { UserRole } from '../../user/types/user.types';
 
 describe('JwtStrategy', () => {
   let strategy: JwtStrategy;
@@ -18,6 +19,8 @@ describe('JwtStrategy', () => {
     username: 'testuser',
     email: 'test@example.com',
     fullName: 'Test User',
+    organizationId: 'org-123',
+    role: 'AGENT' as UserRole,
     password: 'hashedpassword123',
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -27,6 +30,8 @@ describe('JwtStrategy', () => {
     sub: '123e4567-e89b-12d3-a456-426614174000',
     username: 'testuser',
     email: 'test@example.com',
+    organizationId: 'org-123',
+    role: 'AGENT' as UserRole,
   };
 
   const mockRequest = {
@@ -95,6 +100,8 @@ describe('JwtStrategy', () => {
         username: mockUser.username,
         email: mockUser.email,
         fullName: mockUser.fullName,
+        organizationId: mockUser.organizationId,
+        role: mockUser.role,
       });
       expect(userService.findById).toHaveBeenCalledWith(mockJwtPayload.sub);
       expect(securityLogger.logTokenValidationSuccess).toHaveBeenCalledWith(
@@ -139,10 +146,10 @@ describe('JwtStrategy', () => {
       ).rejects.toThrow(UnauthorizedException);
       await expect(
         strategy.validate(mockRequest, mockJwtPayload),
-      ).rejects.toThrow('Invalid token - user not found');
+      ).rejects.toThrow('Invalid token');
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[JWT STRATEGY] User not found for ID: 123e4567-e89b-12d3-a456-426614174000',
+        '[JWT STRATEGY] Token validation failed: User not found',
       );
 
       consoleSpy.mockRestore();
@@ -236,6 +243,8 @@ describe('JwtStrategy', () => {
         username: mockUser.username,
         email: mockUser.email,
         fullName: mockUser.fullName,
+        organizationId: mockUser.organizationId,
+        role: mockUser.role,
       });
       expect(
         jwtValidationService.extractTokenFromHeader,
@@ -318,6 +327,8 @@ describe('JwtStrategy', () => {
         username: mockUser.username,
         email: mockUser.email,
         fullName: mockUser.fullName,
+        organizationId: mockUser.organizationId,
+        role: mockUser.role,
       });
       expect(securityLogger.logTokenValidationSuccess).toHaveBeenCalledWith(
         mockUser.id,

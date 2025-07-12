@@ -123,6 +123,7 @@ describe('Audio Analysis E2E - Complete Workflow Tests', () => {
           url: 'https://example.com/test-e2e.mp3',
           size: 1024,
           mimetype: 'audio/mpeg',
+          organizationId: 'test-org-id',
         },
       });
       fileId = storageRecord.id;
@@ -132,6 +133,7 @@ describe('Audio Analysis E2E - Complete Workflow Tests', () => {
           fileId,
           status: JobStatus.processing,
           startedAt: new Date(),
+          organizationId: 'test-org-id',
         },
       });
       jobId = job.id;
@@ -173,6 +175,7 @@ describe('Audio Analysis E2E - Complete Workflow Tests', () => {
           url: 'https://example.com/test-results.mp3',
           size: 1024,
           mimetype: 'audio/mpeg',
+          organizationId: 'test-org-id',
         },
       });
 
@@ -181,6 +184,7 @@ describe('Audio Analysis E2E - Complete Workflow Tests', () => {
           fileId: storageRecord.id,
           status: JobStatus.completed,
           completedAt: new Date(),
+          organizationId: 'test-org-id',
         },
       });
       jobId = job.id;
@@ -191,6 +195,7 @@ describe('Audio Analysis E2E - Complete Workflow Tests', () => {
           transcript: 'This is a test transcript',
           sentiment: 'positive',
           metadata: { confidence: 0.95, words: 6 },
+          organizationId: 'test-org-id',
         },
       });
       resultId = result.id;
@@ -223,6 +228,7 @@ describe('Audio Analysis E2E - Complete Workflow Tests', () => {
           url: 'https://example.com/no-results.mp3',
           size: 1024,
           mimetype: 'audio/mpeg',
+          organizationId: 'test-org-id',
         },
       });
 
@@ -230,6 +236,7 @@ describe('Audio Analysis E2E - Complete Workflow Tests', () => {
         data: {
           fileId: storageRecord.id,
           status: JobStatus.pending,
+          organizationId: 'test-org-id',
         },
       });
 
@@ -253,6 +260,7 @@ describe('Audio Analysis E2E - Complete Workflow Tests', () => {
           url: 'https://example.com/webhook-test.mp3',
           size: 1024,
           mimetype: 'audio/mpeg',
+          organizationId: 'test-org-id',
         },
       });
 
@@ -260,6 +268,7 @@ describe('Audio Analysis E2E - Complete Workflow Tests', () => {
         data: {
           fileId: storageRecord.id,
           status: JobStatus.processing,
+          organizationId: 'test-org-id',
         },
       });
       jobId = job.id;
@@ -291,6 +300,7 @@ describe('Audio Analysis E2E - Complete Workflow Tests', () => {
           url: 'https://example.com/failed-test.mp3',
           size: 1024,
           mimetype: 'audio/mpeg',
+          organizationId: 'test-org-id',
         },
       });
 
@@ -298,6 +308,7 @@ describe('Audio Analysis E2E - Complete Workflow Tests', () => {
         data: {
           fileId: storageRecord.id,
           status: JobStatus.processing,
+          organizationId: 'test-org-id',
         },
       });
 

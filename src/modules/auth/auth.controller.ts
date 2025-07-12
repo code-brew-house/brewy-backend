@@ -21,6 +21,10 @@ import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { AuthResponseDto } from './dto/auth-response.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequestUser } from '../../common/types/request.types';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { Roles } from '../../common/decorators/roles.decorator';
 
 /**
  * AuthController handles HTTP endpoints for authentication operations.
@@ -182,6 +186,73 @@ export class AuthController {
         `[AUTH VALIDATE] Token validation failed: ${error.message}`,
       );
       return { valid: false };
+    }
+  }
+
+  /**
+   * Switch organization context for SUPER_OWNER
+   * @param organizationId - Target organization ID
+   * @param currentUser - Current authenticated user
+   * @returns New authentication response with updated token
+   */
+  @Post('switch-organization')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('SUPER_OWNER')
+  @UsePipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      validationError: { target: false, value: false },
+    }),
+  )
+  async switchOrganization(
+    @Body() body: { organizationId: string },
+    @CurrentUser() currentUser: RequestUser,
+  ): Promise<AuthResponseDto> {
+    try {
+      return await this.authService.switchOrganization(
+        currentUser.id,
+        body.organizationId,
+      );
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        'Organization switch failed: ' + error.message,
+      );
+    }
+  }
+
+  /**
+   * Get organizations accessible to the current user
+   * @param currentUser - Current authenticated user
+   * @returns List of accessible organizations
+   */
+  @Get('organizations')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(JwtAuthGuard)
+  async getAccessibleOrganizations(
+    @CurrentUser() currentUser: RequestUser,
+  ): Promise<{
+    organizations: Array<{
+      id: string;
+      name: string;
+      email: string;
+      isCurrent: boolean;
+    }>;
+  }> {
+    try {
+      return await this.authService.getAccessibleOrganizations(currentUser.id);
+    } catch (error) {
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+      throw new InternalServerErrorException(
+        'Failed to get accessible organizations: ' + error.message,
+      );
     }
   }
 }

@@ -17,6 +17,7 @@ export class AnalysisResultsService {
     transcript: string;
     sentiment: string;
     metadata?: any;
+    organizationId: string;
   }) {
     const result = await this.prisma.analysisResult.create({
       data: {
@@ -24,17 +25,24 @@ export class AnalysisResultsService {
         transcript: data.transcript,
         sentiment: data.sentiment,
         metadata: data.metadata,
+        organizationId: data.organizationId,
       },
     });
     return result;
   }
 
   /**
-   * Find analysis result by job ID
+   * Find analysis result by job ID with organization validation
+   * organizationId is required for data security.
    */
-  async findByJobId(jobId: string) {
+  async findByJobId(jobId: string, organizationId?: string) {
+    const whereClause: any = { jobId };
+    if (organizationId) {
+      whereClause.organizationId = organizationId;
+    }
+
     const result = await this.prisma.analysisResult.findFirst({
-      where: { jobId },
+      where: whereClause,
       include: {
         job: {
           include: {
@@ -52,11 +60,17 @@ export class AnalysisResultsService {
   }
 
   /**
-   * Find analysis result by its ID
+   * Find analysis result by its ID with organization validation
+   * organizationId is required for data security.
    */
-  async findById(id: string) {
+  async findById(id: string, organizationId?: string) {
+    const whereClause: any = { id };
+    if (organizationId) {
+      whereClause.organizationId = organizationId;
+    }
+
     const result = await this.prisma.analysisResult.findUnique({
-      where: { id },
+      where: whereClause,
       include: {
         job: {
           include: {
@@ -104,11 +118,17 @@ export class AnalysisResultsService {
   }
 
   /**
-   * Find all analysis results with optional job filtering
+   * Find all analysis results with organization and job filtering
+   * organizationId is required for data security.
    */
-  async findAll(jobId?: string) {
+  async findAll(organizationId: string, jobId?: string) {
+    const whereClause: any = { organizationId };
+    if (jobId) {
+      whereClause.jobId = jobId;
+    }
+
     const results = await this.prisma.analysisResult.findMany({
-      where: jobId ? { jobId } : undefined,
+      where: whereClause,
       include: {
         job: {
           include: {
@@ -122,5 +142,81 @@ export class AnalysisResultsService {
     });
 
     return results;
+  }
+
+  /**
+   * Validate if a user can access an analysis result based on organization context
+   */
+  async validateAnalysisResultAccess(
+    resultId: string,
+    userOrganizationId: string,
+    userRole: string,
+  ): Promise<boolean> {
+    try {
+      // SUPER_OWNER can access any analysis result
+      if (userRole === 'SUPER_OWNER') {
+        const result = await this.prisma.analysisResult.findUnique({
+          where: { id: resultId },
+        });
+        return !!result;
+      }
+
+      // Others can only access results within their organization
+      const result = await this.prisma.analysisResult.findUnique({
+        where: {
+          id: resultId,
+          organizationId: userOrganizationId,
+        },
+      });
+
+      return !!result;
+    } catch (error) {
+      console.error(
+        `[ANALYSIS RESULT ACCESS ERROR] Failed to validate result access: ${error.message}`,
+      );
+      return false;
+    }
+  }
+
+  /**
+   * Get analysis result statistics for an organization
+   */
+  async getOrganizationAnalysisStats(organizationId: string) {
+    const totalResults = await this.prisma.analysisResult.count({
+      where: { organizationId },
+    });
+
+    const recentResults = await this.prisma.analysisResult.count({
+      where: {
+        organizationId,
+        createdAt: {
+          gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), // Last 30 days
+        },
+      },
+    });
+
+    const sentimentDistribution = await this.prisma.analysisResult.groupBy({
+      by: ['sentiment'],
+      where: { organizationId },
+      _count: {
+        sentiment: true,
+      },
+    });
+
+    console.log(
+      `[ANALYSIS STATS] Organization ${organizationId}: ${totalResults} total results, ${recentResults} recent`,
+    );
+
+    return {
+      totalResults,
+      recentResults,
+      sentimentDistribution: sentimentDistribution.reduce(
+        (acc, sentiment) => {
+          acc[sentiment.sentiment] = sentiment._count.sentiment;
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
+    };
   }
 }

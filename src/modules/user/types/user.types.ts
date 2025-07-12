@@ -1,4 +1,9 @@
 /**
+ * User roles within an organization
+ */
+export type UserRole = 'SUPER_OWNER' | 'OWNER' | 'ADMIN' | 'AGENT';
+
+/**
  * Interface for user data as stored in the database
  */
 export interface IUser {
@@ -7,6 +12,8 @@ export interface IUser {
   email: string;
   password: string;
   fullName: string;
+  organizationId: string;
+  role: UserRole;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -19,6 +26,8 @@ export interface ICreateUser {
   email: string;
   password: string;
   fullName: string;
+  organizationId: string;
+  role: UserRole;
 }
 
 /**
@@ -28,6 +37,8 @@ export interface IUpdateUser {
   username?: string;
   email?: string;
   fullName?: string;
+  organizationId?: string;
+  role?: UserRole;
 }
 
 /**
@@ -37,6 +48,8 @@ export interface IUserFilters {
   id?: string;
   username?: string;
   email?: string;
+  organizationId?: string;
+  role?: UserRole;
 }
 
 /**
@@ -47,8 +60,14 @@ export interface IUserService {
   findByEmail(email: string): Promise<IUser | null>;
   findByUsername(username: string): Promise<IUser | null>;
   findById(id: string): Promise<IUser | null>;
+  findByOrganization(organizationId: string): Promise<IUser[]>;
   update(id: string, updateData: IUpdateUser): Promise<IUser>;
   delete(id: string): Promise<void>;
+  validateOrganizationAccess(
+    userId: string,
+    organizationId: string,
+  ): Promise<boolean>;
+  countByOrganization(organizationId: string): Promise<number>;
 }
 
 /**
@@ -60,4 +79,5 @@ export interface IUserRepository {
   findMany(filters?: IUserFilters): Promise<IUser[]>;
   update(id: string, updateData: IUpdateUser): Promise<IUser>;
   delete(id: string): Promise<void>;
+  countByOrganization(organizationId: string): Promise<number>;
 }

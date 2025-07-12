@@ -62,9 +62,6 @@ export class CreateUserDto {
   /** Full name with format validation */
   @IsString({ message: 'Full name must be a string' })
   @IsNotEmpty({ message: 'Full name is required' })
-  @Transform(({ value }: { value: any }) =>
-    typeof value === 'string' ? value.trim() : value,
-  )
   @MinLength(1, { message: 'Full name cannot be empty' })
   @MaxLength(100, { message: 'Full name must not exceed 100 characters' })
   @Matches(/^[a-zA-ZÀ-ÿ\s'-]+$/, {

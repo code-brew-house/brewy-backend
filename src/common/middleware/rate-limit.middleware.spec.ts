@@ -28,6 +28,7 @@ describe('RateLimitMiddleware', () => {
             logSecurityEvent: jest.fn(),
             logAuthEvent: jest.fn(),
             logRateLimitEvent: jest.fn(),
+            logRateLimitExceeded: jest.fn(),
           },
         },
       ],
@@ -39,7 +40,7 @@ describe('RateLimitMiddleware', () => {
     mockRequest = {
       ip: '192.168.1.1',
       headers: {},
-      connection: { remoteAddress: '192.168.1.1' },
+      socket: { remoteAddress: '192.168.1.1' },
       path: '/auth/login',
       method: 'POST',
     };
@@ -96,7 +97,7 @@ describe('RateLimitMiddleware', () => {
       expect(result).toBe('192.168.1.1');
     });
 
-    it('should fallback to connection.remoteAddress when request.ip is not available', async () => {
+    it('should fallback to socket.remoteAddress when request.ip is not available', async () => {
       mockRequest.ip = undefined;
 
       const result = await middleware['getTracker'](mockRequest);
@@ -106,7 +107,7 @@ describe('RateLimitMiddleware', () => {
 
     it('should return "unknown" when no IP can be determined', async () => {
       mockRequest.ip = undefined;
-      mockRequest.connection = {};
+      mockRequest.socket = {};
 
       const result = await middleware['getTracker'](mockRequest);
 

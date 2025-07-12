@@ -1,7 +1,9 @@
 import { createParamDecorator, ExecutionContext } from '@nestjs/common';
+import { RequestUser } from '../types/request.types';
 
 /**
  * Interface for the current user object extracted from JWT
+ * @deprecated Use RequestUser from request.types.ts instead
  */
 export interface CurrentUserData {
   id: string;
@@ -12,11 +14,12 @@ export interface CurrentUserData {
 
 /**
  * Parameter decorator to extract the current user from JWT token
+ * Now includes organization context (organizationId and role)
  *
  * Usage:
  * @Get('profile')
  * @UseGuards(JwtAuthGuard)
- * getProfile(@CurrentUser() user: CurrentUserData) {
+ * getProfile(@CurrentUser() user: RequestUser) {
  *   return user;
  * }
  *
@@ -26,11 +29,17 @@ export interface CurrentUserData {
  * getProfile(@CurrentUser('id') userId: string) {
  *   return userId;
  * }
+ *
+ * @Get('organization-data')
+ * @UseGuards(JwtAuthGuard)
+ * getOrgData(@CurrentUser('organizationId') orgId: string) {
+ *   return this.service.findByOrganization(orgId);
+ * }
  */
 export const CurrentUser = createParamDecorator(
-  (data: keyof CurrentUserData | undefined, ctx: ExecutionContext) => {
+  (data: keyof RequestUser | undefined, ctx: ExecutionContext) => {
     const request = ctx.switchToHttp().getRequest();
-    const user = request.user;
+    const user: RequestUser = request.user;
 
     if (!user) {
       return null;
@@ -41,7 +50,7 @@ export const CurrentUser = createParamDecorator(
       return user[data];
     }
 
-    // Otherwise return the full user object
+    // Otherwise return the full user object with organization context
     return user;
   },
 );

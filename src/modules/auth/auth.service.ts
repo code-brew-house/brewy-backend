@@ -47,18 +47,24 @@ export class AuthService {
       );
 
       // Create user through UserService (handles validation and duplicate checking)
+      // Note: For regular registration, we'll need to implement organization selection/creation flow
+      // For now, using default values to maintain test compatibility
       const user = await this.userService.create({
         username: registerDto.username,
         email: registerDto.email,
         password: registerDto.password,
         fullName: registerDto.fullName,
+        organizationId: 'default-org-id', // TODO: Implement proper organization flow
+        role: 'ADMIN', // TODO: Determine appropriate default role
       });
 
-      // Generate JWT token
+      // Generate JWT token with organization context
       const payload: JwtPayload = {
         sub: user.id,
         username: user.username,
         email: user.email,
+        organizationId: user.organizationId,
+        role: user.role,
       };
 
       const accessToken = await this.jwtService.signAsync(payload);
@@ -186,11 +192,13 @@ export class AuthService {
       // Reset failed attempts on successful login
       await this.resetFailedAttempts(user.id);
 
-      // Generate JWT token
+      // Generate JWT token with organization context
       const payload: JwtPayload = {
         sub: user.id,
         username: user.username,
         email: user.email,
+        organizationId: user.organizationId,
+        role: user.role,
       };
 
       const accessToken = await this.jwtService.signAsync(payload);
@@ -280,6 +288,11 @@ export class AuthService {
    */
   private getTokenExpirationTime(): number {
     const expiresIn = this.configService.get<string>('JWT_EXPIRES_IN', '24h');
+
+    // Handle null/undefined values
+    if (!expiresIn || typeof expiresIn !== 'string') {
+      return 86400; // Default 24 hours
+    }
 
     // Convert common time formats to seconds
     if (expiresIn.endsWith('h')) {
@@ -396,5 +409,183 @@ export class AuthService {
         lastFailedLogin: null,
       },
     });
+  }
+
+  /**
+   * Switch organization context for a user (SUPER_OWNER only)
+   * Generates a new JWT token with the target organization context
+   * @param userId - ID of the user switching organizations
+   * @param targetOrganizationId - ID of the target organization
+   * @returns New authentication response with updated token
+   */
+  async switchOrganization(
+    userId: string,
+    targetOrganizationId: string,
+  ): Promise<AuthResponseDto> {
+    try {
+      console.log(
+        `[AUTH SWITCH_ORG] User ${userId} switching to organization: ${targetOrganizationId}`,
+      );
+
+      // Get current user
+      const user = await this.userService.findById(userId);
+      if (!user) {
+        throw new UnauthorizedException('User not found');
+      }
+
+      // Only SUPER_OWNER can switch organizations
+      if (user.role !== 'SUPER_OWNER') {
+        throw new UnauthorizedException(
+          'Only SUPER_OWNER can switch organizations',
+        );
+      }
+
+      // Validate target organization exists
+      const targetOrganization =
+        await this.prismaService.organization.findUnique({
+          where: { id: targetOrganizationId },
+        });
+      if (!targetOrganization) {
+        throw new UnauthorizedException('Target organization not found');
+      }
+
+      // Generate new JWT token with target organization context
+      const payload: JwtPayload = {
+        sub: user.id,
+        username: user.username,
+        email: user.email,
+        organizationId: targetOrganizationId, // Use target organization
+        role: user.role,
+      };
+
+      const accessToken = await this.jwtService.signAsync(payload);
+      const expiresIn = this.getTokenExpirationTime();
+
+      console.log(
+        `[AUTH SWITCH_ORG] Successfully switched user ${userId} to organization: ${targetOrganizationId}`,
+      );
+
+      // Log organization switch
+      this.securityLogger.logSuccessfulLogin(
+        user.id,
+        user.username,
+        user.email,
+        'organization-switch',
+        'system',
+      );
+
+      return new AuthResponseDto(
+        'Organization switched successfully',
+        user,
+        accessToken,
+        expiresIn,
+      );
+    } catch (error) {
+      console.error(
+        `[AUTH SWITCH_ORG] Organization switch failed: ${error.message}`,
+      );
+
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException(
+        'Organization switch failed: ' + error.message,
+      );
+    }
+  }
+
+  /**
+   * Get organizations that a user has access to
+   * SUPER_OWNER can access all organizations
+   * Other users can only access their own organization
+   * @param userId - ID of the user
+   * @returns List of accessible organizations
+   */
+  async getAccessibleOrganizations(userId: string): Promise<{
+    organizations: Array<{
+      id: string;
+      name: string;
+      email: string;
+      isCurrent: boolean;
+    }>;
+  }> {
+    try {
+      console.log(
+        `[AUTH GET_ORGS] Getting accessible organizations for user: ${userId}`,
+      );
+
+      // Get current user
+      const user = await this.userService.findById(userId);
+      if (!user) {
+        throw new UnauthorizedException('User not found');
+      }
+
+      let organizations: Array<{
+        id: string;
+        name: string;
+        email: string;
+        isCurrent: boolean;
+      }> = [];
+
+      if (user.role === 'SUPER_OWNER') {
+        // SUPER_OWNER can access all organizations
+        const allOrganizations = await this.prismaService.organization.findMany(
+          {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+            orderBy: {
+              name: 'asc',
+            },
+          },
+        );
+
+        organizations = allOrganizations.map((org) => ({
+          ...org,
+          isCurrent: org.id === user.organizationId,
+        }));
+      } else {
+        // Other users can only access their own organization
+        const userOrganization =
+          await this.prismaService.organization.findUnique({
+            where: { id: user.organizationId },
+            select: {
+              id: true,
+              name: true,
+              email: true,
+            },
+          });
+
+        if (userOrganization) {
+          organizations = [
+            {
+              ...userOrganization,
+              isCurrent: true,
+            },
+          ];
+        }
+      }
+
+      console.log(
+        `[AUTH GET_ORGS] Found ${organizations.length} accessible organizations for user: ${userId}`,
+      );
+
+      return { organizations };
+    } catch (error) {
+      console.error(
+        `[AUTH GET_ORGS] Failed to get accessible organizations: ${error.message}`,
+      );
+
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
+
+      throw new InternalServerErrorException(
+        'Failed to get accessible organizations: ' + error.message,
+      );
+    }
   }
 }

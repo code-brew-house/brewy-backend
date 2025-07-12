@@ -11,6 +11,12 @@ export interface JwtPayload {
   /** Email address */
   email: string;
 
+  /** Organization ID */
+  organizationId: string;
+
+  /** User role within organization */
+  role: 'SUPER_OWNER' | 'OWNER' | 'ADMIN' | 'AGENT';
+
   /** Token issued at timestamp */
   iat?: number;
 

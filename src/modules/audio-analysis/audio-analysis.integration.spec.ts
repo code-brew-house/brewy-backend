@@ -6,6 +6,9 @@ import { AudioAnalysisService } from './audio-analysis.service';
 import { ConfigService } from '@nestjs/config';
 import { ValidationPipe } from '@nestjs/common';
 import { JobStatus } from '../../../generated/prisma';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../../common/guards/roles.guard';
+import { OrganizationGuard } from '../../common/guards/organization.guard';
 
 describe('AudioAnalysis Integration Tests', () => {
   let app: INestApplication;
@@ -21,6 +24,22 @@ describe('AudioAnalysis Integration Tests', () => {
     get: jest.fn(),
   };
 
+  // Mock guards to bypass authentication for integration tests
+  const mockGuard = {
+    canActivate: jest.fn((context) => {
+      const request = context.switchToHttp().getRequest();
+      // Set up mock user context for controller
+      request.user = {
+        id: 'test-user-id',
+        username: 'test-user',
+        role: 'SUPER_OWNER', // Use SUPER_OWNER to bypass organization filtering
+        organizationId: 'test-org-id',
+      };
+      request.organizationId = 'test-org-id';
+      return true;
+    }),
+  };
+
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AudioAnalysisModule],
@@ -29,6 +48,12 @@ describe('AudioAnalysis Integration Tests', () => {
       .useValue(mockAudioAnalysisService)
       .overrideProvider(ConfigService)
       .useValue(mockConfigService)
+      .overrideGuard(JwtAuthGuard)
+      .useValue(mockGuard)
+      .overrideGuard(RolesGuard)
+      .useValue(mockGuard)
+      .overrideGuard(OrganizationGuard)
+      .useValue(mockGuard)
       .compile();
 
     app = moduleFixture.createNestApplication();
@@ -78,6 +103,7 @@ describe('AudioAnalysis Integration Tests', () => {
           originalname: 'test.mp3',
           mimetype: 'audio/mpeg',
         }),
+        'test-org-id', // organizationId from mocked guard
       );
     });
 
@@ -164,6 +190,7 @@ describe('AudioAnalysis Integration Tests', () => {
       });
       expect(mockAudioAnalysisService.getJobStatus).toHaveBeenCalledWith(
         validJobId,
+        undefined, // organizationId filtered for mocked SUPER_OWNER
       );
     });
 
@@ -239,6 +266,7 @@ describe('AudioAnalysis Integration Tests', () => {
       });
       expect(mockAudioAnalysisService.getAnalysisResults).toHaveBeenCalledWith(
         validJobId,
+        undefined, // organizationId filtered for mocked SUPER_OWNER
       );
     });
 

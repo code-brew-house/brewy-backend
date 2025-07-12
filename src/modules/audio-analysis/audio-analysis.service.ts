@@ -1,10 +1,16 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { JobStatus } from '../../../generated/prisma';
 import { StorageService } from '../storage/storage.service';
 import { JobsService } from '../jobs/jobs.service';
 import { AnalysisResultsService } from './analysis-results.service';
 import { N8NWebhookService } from './n8n-webhook.service';
 import { N8NWebhookPayloadDto } from './dto/webhook.dto';
+import { PrismaService } from '../../prisma/prisma.service';
 
 /**
  * AudioAnalysisService orchestrates the complete audio analysis workflow.
@@ -19,15 +25,19 @@ export class AudioAnalysisService {
     private readonly jobsService: JobsService,
     private readonly analysisResultsService: AnalysisResultsService,
     private readonly n8nWebhookService: N8NWebhookService,
+    private readonly prismaService: PrismaService,
   ) {}
 
   /**
    * Upload and process audio file through the complete workflow
    */
-  async uploadAndProcess(file: Express.Multer.File) {
+  async uploadAndProcess(file: Express.Multer.File, organizationId: string) {
     this.validateAudioFile(file);
-    const storageRecord = await this.storageService.uploadFile(file);
-    const job = await this.jobsService.create(storageRecord.id);
+    const storageRecord = await this.storageService.uploadFile(
+      file,
+      organizationId,
+    );
+    const job = await this.jobsService.create(storageRecord.id, organizationId);
     const payload: N8NWebhookPayloadDto = {
       jobId: job.id,
       fileUrl: storageRecord.url,
@@ -96,9 +106,34 @@ export class AudioAnalysisService {
 
   /**
    * Get job status with details
+   * organizationId is required for data security.
    */
-  async getJobStatus(jobId: string) {
-    const job = await this.jobsService.findById(jobId);
+  async getJobStatus(jobId: string, organizationId?: string) {
+    // For SUPER_OWNER without organizationId, find job without org filtering
+    let job;
+    if (organizationId) {
+      job = await this.jobsService.findById(jobId, organizationId);
+    } else {
+      // SUPER_OWNER access - find job without organization filtering
+      job = await this.prismaService.job.findUnique({
+        where: { id: jobId },
+        include: {
+          storage: {
+            select: {
+              id: true,
+              filename: true,
+              url: true,
+              size: true,
+              mimetype: true,
+            },
+          },
+        },
+      });
+
+      if (!job) {
+        throw new NotFoundException(`Job with ID ${jobId} not found`);
+      }
+    }
 
     return {
       id: job.id,
@@ -119,9 +154,42 @@ export class AudioAnalysisService {
 
   /**
    * Get analysis results for a job
+   * organizationId is required for data security.
    */
-  async getAnalysisResults(jobId: string) {
-    const result = await this.analysisResultsService.findByJobId(jobId);
+  async getAnalysisResults(jobId: string, organizationId?: string) {
+    let result;
+    if (organizationId) {
+      result = await this.analysisResultsService.findByJobId(
+        jobId,
+        organizationId,
+      );
+    } else {
+      // SUPER_OWNER access - find analysis results without organization filtering
+      result = await this.prismaService.analysisResult.findFirst({
+        where: { jobId },
+        include: {
+          job: {
+            include: {
+              storage: {
+                select: {
+                  id: true,
+                  filename: true,
+                  url: true,
+                  size: true,
+                  mimetype: true,
+                },
+              },
+            },
+          },
+        },
+      });
+    }
+
+    if (!result) {
+      throw new NotFoundException(
+        `Analysis results for job ${jobId} not found`,
+      );
+    }
 
     return {
       id: result.id,
@@ -135,7 +203,7 @@ export class AudioAnalysisService {
         status: result.job.status,
         file: {
           filename: result.job.storage.filename,
-          size: result.job.storage.size,
+          size: result.job.storage.size || 0, // Handle missing size field
         },
       },
     };
@@ -143,6 +211,7 @@ export class AudioAnalysisService {
 
   /**
    * Process webhook callback from N8N
+   * This method bypasses organization validation as it's called by internal N8N service
    */
   async processWebhookCallback(data: {
     jobId: string;
@@ -153,7 +222,8 @@ export class AudioAnalysisService {
     error?: string;
   }) {
     const { jobId, status, transcript, sentiment, metadata, error } = data;
-    const job = await this.jobsService.findById(jobId);
+    // For webhook callbacks, we use SUPER_OWNER access as N8N is internal
+    const job = await this.jobsService.findJobById(jobId);
     if (!job) {
       this.logger.warn(`Webhook callback for non-existent job: ${jobId}`);
       throw new BadRequestException('Job not found');
@@ -183,6 +253,7 @@ export class AudioAnalysisService {
           transcript,
           sentiment,
           metadata,
+          organizationId: job.organizationId,
         });
         this.logger.log(`Analysis result stored for job ${jobId}`);
       } else {

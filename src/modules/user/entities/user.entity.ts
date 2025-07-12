@@ -1,4 +1,12 @@
-import { IsEmail, IsString, IsUUID, IsDate, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  IsUUID,
+  IsDate,
+  MinLength,
+  IsIn,
+} from 'class-validator';
+import { UserRole } from '../types/user.types';
 
 /**
  * User entity representing the user model with validation
@@ -21,6 +29,15 @@ export class User {
   @IsString()
   @MinLength(1, { message: 'Full name is required' })
   fullName: string;
+
+  @IsUUID()
+  organizationId: string;
+
+  @IsString()
+  @IsIn(['SUPER_OWNER', 'OWNER', 'ADMIN', 'AGENT'], {
+    message: 'Role must be one of: SUPER_OWNER, OWNER, ADMIN, AGENT',
+  })
+  role: UserRole;
 
   @IsDate()
   createdAt: Date;

@@ -10,9 +10,14 @@ export class AuthResponseDto {
   /** Response message */
   message: string;
 
-  /** Response data containing user and token */
+  /** Response data containing user, organization, and token */
   data: {
     user: UserResponseDto;
+    organization?: {
+      id: string;
+      name: string;
+      role: string;
+    };
     token: string;
     tokenType?: string;
     expiresIn?: number;
@@ -23,11 +28,17 @@ export class AuthResponseDto {
     user: UserResponseDto,
     token: string,
     expiresIn?: number,
+    organization?: {
+      id: string;
+      name: string;
+      role: string;
+    },
   ) {
     this.success = true;
     this.message = message;
     this.data = {
       user,
+      organization,
       token,
       tokenType: 'Bearer',
       expiresIn,

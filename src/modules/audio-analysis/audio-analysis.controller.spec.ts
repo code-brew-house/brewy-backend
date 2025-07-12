@@ -16,7 +16,6 @@ describe('AudioAnalysisController', () => {
     uploadAndProcess: jest.fn(),
     getJobStatus: jest.fn(),
     getAnalysisResults: jest.fn(),
-    processWebhookCallback: jest.fn(),
   };
 
   const mockConfigService = {
@@ -53,6 +52,8 @@ describe('AudioAnalysisController', () => {
       buffer: Buffer.from('test'),
     } as Express.Multer.File;
 
+    const mockOrganizationId = 'org-id-123';
+
     const mockUploadResponse = {
       jobId: 'job-id',
       fileId: 'file-id',
@@ -65,18 +66,19 @@ describe('AudioAnalysisController', () => {
         mockUploadResponse,
       );
 
-      const result = await controller.uploadAudio(mockFile);
+      const result = await controller.uploadAudio(mockFile, mockOrganizationId);
 
       expect(mockAudioAnalysisService.uploadAndProcess).toHaveBeenCalledWith(
         mockFile,
+        mockOrganizationId,
       );
       expect(result).toEqual(mockUploadResponse);
     });
 
     it('should throw BadRequestException when no file is provided', async () => {
-      await expect(controller.uploadAudio(null as any)).rejects.toThrow(
-        new BadRequestException('Audio file is required'),
-      );
+      await expect(
+        controller.uploadAudio(null as any, mockOrganizationId),
+      ).rejects.toThrow(new BadRequestException('Audio file is required'));
 
       expect(mockAudioAnalysisService.uploadAndProcess).not.toHaveBeenCalled();
     });
@@ -86,7 +88,9 @@ describe('AudioAnalysisController', () => {
         new Error('File size must be 20MB or less'),
       );
 
-      await expect(controller.uploadAudio(mockFile)).rejects.toThrow(
+      await expect(
+        controller.uploadAudio(mockFile, mockOrganizationId),
+      ).rejects.toThrow(
         new BadRequestException('File size exceeds 20MB limit'),
       );
     });
@@ -96,9 +100,9 @@ describe('AudioAnalysisController', () => {
         new Error('Only MP3 files are allowed'),
       );
 
-      await expect(controller.uploadAudio(mockFile)).rejects.toThrow(
-        new BadRequestException('Only MP3 files are allowed'),
-      );
+      await expect(
+        controller.uploadAudio(mockFile, mockOrganizationId),
+      ).rejects.toThrow(new BadRequestException('Only MP3 files are allowed'));
     });
 
     it('should handle storage error from service', async () => {
@@ -106,7 +110,9 @@ describe('AudioAnalysisController', () => {
         new Error('Failed to upload to storage'),
       );
 
-      await expect(controller.uploadAudio(mockFile)).rejects.toThrow(
+      await expect(
+        controller.uploadAudio(mockFile, mockOrganizationId),
+      ).rejects.toThrow(
         new InternalServerErrorException('Failed to store file'),
       );
     });
@@ -116,7 +122,9 @@ describe('AudioAnalysisController', () => {
         new Error('Unknown error'),
       );
 
-      await expect(controller.uploadAudio(mockFile)).rejects.toThrow(
+      await expect(
+        controller.uploadAudio(mockFile, mockOrganizationId),
+      ).rejects.toThrow(
         new InternalServerErrorException('Failed to process audio file'),
       );
     });
@@ -124,6 +132,15 @@ describe('AudioAnalysisController', () => {
 
   describe('getJobStatus', () => {
     const jobId = '550e8400-e29b-41d4-a716-446655440000';
+    const mockUser = {
+      id: 'user-id',
+      username: 'testuser',
+      email: 'test@example.com',
+      fullName: 'Test User',
+      organizationId: 'org-id-123',
+      role: 'ADMIN' as const,
+    };
+    const mockOrganizationId = 'org-id-123';
     const mockJobStatus = {
       id: jobId,
       status: JobStatus.completed,
@@ -143,9 +160,33 @@ describe('AudioAnalysisController', () => {
     it('should return job status for valid job ID', async () => {
       mockAudioAnalysisService.getJobStatus.mockResolvedValue(mockJobStatus);
 
-      const result = await controller.getJobStatus(jobId);
+      const result = await controller.getJobStatus(
+        jobId,
+        mockUser,
+        mockOrganizationId,
+      );
 
-      expect(mockAudioAnalysisService.getJobStatus).toHaveBeenCalledWith(jobId);
+      expect(mockAudioAnalysisService.getJobStatus).toHaveBeenCalledWith(
+        jobId,
+        mockOrganizationId,
+      );
+      expect(result).toEqual(mockJobStatus);
+    });
+
+    it('should return job status for SUPER_OWNER without organization filter', async () => {
+      const superOwnerUser = { ...mockUser, role: 'SUPER_OWNER' as const };
+      mockAudioAnalysisService.getJobStatus.mockResolvedValue(mockJobStatus);
+
+      const result = await controller.getJobStatus(
+        jobId,
+        superOwnerUser,
+        mockOrganizationId,
+      );
+
+      expect(mockAudioAnalysisService.getJobStatus).toHaveBeenCalledWith(
+        jobId,
+        undefined,
+      );
       expect(result).toEqual(mockJobStatus);
     });
 
@@ -154,7 +195,9 @@ describe('AudioAnalysisController', () => {
         new Error('Job with ID test-id not found'),
       );
 
-      await expect(controller.getJobStatus(jobId)).rejects.toThrow(
+      await expect(
+        controller.getJobStatus(jobId, mockUser, mockOrganizationId),
+      ).rejects.toThrow(
         new NotFoundException(`Job with ID ${jobId} not found`),
       );
     });
@@ -164,7 +207,9 @@ describe('AudioAnalysisController', () => {
         new Error('Database connection failed'),
       );
 
-      await expect(controller.getJobStatus(jobId)).rejects.toThrow(
+      await expect(
+        controller.getJobStatus(jobId, mockUser, mockOrganizationId),
+      ).rejects.toThrow(
         new InternalServerErrorException('Failed to retrieve job status'),
       );
     });
@@ -172,6 +217,15 @@ describe('AudioAnalysisController', () => {
 
   describe('getAnalysisResults', () => {
     const jobId = '550e8400-e29b-41d4-a716-446655440000';
+    const mockUser = {
+      id: 'user-id',
+      username: 'testuser',
+      email: 'test@example.com',
+      fullName: 'Test User',
+      organizationId: 'org-id-123',
+      role: 'ADMIN' as const,
+    };
+    const mockOrganizationId = 'org-id-123';
     const mockAnalysisResults = {
       id: 'result-id',
       jobId,
@@ -194,10 +248,34 @@ describe('AudioAnalysisController', () => {
         mockAnalysisResults,
       );
 
-      const result = await controller.getAnalysisResults(jobId);
+      const result = await controller.getAnalysisResults(
+        jobId,
+        mockUser,
+        mockOrganizationId,
+      );
 
       expect(mockAudioAnalysisService.getAnalysisResults).toHaveBeenCalledWith(
         jobId,
+        mockOrganizationId,
+      );
+      expect(result).toEqual(mockAnalysisResults);
+    });
+
+    it('should return analysis results for SUPER_OWNER without organization filter', async () => {
+      const superOwnerUser = { ...mockUser, role: 'SUPER_OWNER' as const };
+      mockAudioAnalysisService.getAnalysisResults.mockResolvedValue(
+        mockAnalysisResults,
+      );
+
+      const result = await controller.getAnalysisResults(
+        jobId,
+        superOwnerUser,
+        mockOrganizationId,
+      );
+
+      expect(mockAudioAnalysisService.getAnalysisResults).toHaveBeenCalledWith(
+        jobId,
+        undefined,
       );
       expect(result).toEqual(mockAnalysisResults);
     });
@@ -207,7 +285,9 @@ describe('AudioAnalysisController', () => {
         new Error('Analysis result for job test-id not found'),
       );
 
-      await expect(controller.getAnalysisResults(jobId)).rejects.toThrow(
+      await expect(
+        controller.getAnalysisResults(jobId, mockUser, mockOrganizationId),
+      ).rejects.toThrow(
         new NotFoundException(`Analysis results for job ${jobId} not found`),
       );
     });
@@ -217,144 +297,11 @@ describe('AudioAnalysisController', () => {
         new Error('Database connection failed'),
       );
 
-      await expect(controller.getAnalysisResults(jobId)).rejects.toThrow(
+      await expect(
+        controller.getAnalysisResults(jobId, mockUser, mockOrganizationId),
+      ).rejects.toThrow(
         new InternalServerErrorException('Failed to retrieve analysis results'),
       );
-    });
-  });
-
-  describe('processWebhook', () => {
-    const mockWebhookData = {
-      jobId: 'job-id',
-      status: 'completed' as const,
-      transcript: 'Test transcript',
-      sentiment: 'positive',
-      metadata: { confidence: 0.95 },
-    };
-
-    const mockHeaders = {
-      'x-n8n-webhook-secret': 'test-secret',
-    };
-
-    const expectedResponse = {
-      success: true,
-      message: 'Webhook processed successfully',
-    };
-
-    beforeEach(() => {
-      mockConfigService.get.mockReturnValue('test-secret');
-      mockAudioAnalysisService.processWebhookCallback.mockResolvedValue({
-        success: true,
-      });
-    });
-
-    it('should process webhook callback successfully', async () => {
-      const result = await controller.processWebhook(
-        mockWebhookData,
-        mockHeaders,
-      );
-
-      expect(
-        mockAudioAnalysisService.processWebhookCallback,
-      ).toHaveBeenCalledWith(mockWebhookData);
-      expect(result).toEqual(expectedResponse);
-    });
-
-    it('should process webhook callback with uppercase header', async () => {
-      const uppercaseHeaders = {
-        'X-N8N-WEBHOOK-SECRET': 'test-secret',
-      };
-
-      const result = await controller.processWebhook(
-        mockWebhookData,
-        uppercaseHeaders,
-      );
-
-      expect(
-        mockAudioAnalysisService.processWebhookCallback,
-      ).toHaveBeenCalledWith(mockWebhookData);
-      expect(result).toEqual(expectedResponse);
-    });
-
-    it('should throw BadRequestException with invalid webhook secret', async () => {
-      const invalidHeaders = {
-        'x-n8n-webhook-secret': 'wrong-secret',
-      };
-
-      await expect(
-        controller.processWebhook(mockWebhookData, invalidHeaders),
-      ).rejects.toThrow(new BadRequestException('Invalid webhook secret'));
-
-      expect(
-        mockAudioAnalysisService.processWebhookCallback,
-      ).not.toHaveBeenCalled();
-    });
-
-    it('should process webhook when no secret is configured', async () => {
-      mockConfigService.get.mockReturnValue(undefined);
-
-      const result = await controller.processWebhook(mockWebhookData, {});
-
-      expect(
-        mockAudioAnalysisService.processWebhookCallback,
-      ).toHaveBeenCalledWith(mockWebhookData);
-      expect(result).toEqual(expectedResponse);
-    });
-
-    it('should throw NotFoundException when job is not found', async () => {
-      mockAudioAnalysisService.processWebhookCallback.mockRejectedValue(
-        new Error('Job not found'),
-      );
-
-      await expect(
-        controller.processWebhook(mockWebhookData, mockHeaders),
-      ).rejects.toThrow(
-        new NotFoundException('Job not found for webhook processing'),
-      );
-    });
-
-    it('should throw BadRequestException for validation errors', async () => {
-      mockAudioAnalysisService.processWebhookCallback.mockRejectedValue(
-        new Error('Missing required validation field'),
-      );
-
-      await expect(
-        controller.processWebhook(mockWebhookData, mockHeaders),
-      ).rejects.toThrow(
-        new BadRequestException(
-          'Invalid webhook payload: Missing required validation field',
-        ),
-      );
-    });
-
-    it('should handle generic errors from service', async () => {
-      mockAudioAnalysisService.processWebhookCallback.mockRejectedValue(
-        new Error('Database connection failed'),
-      );
-
-      await expect(
-        controller.processWebhook(mockWebhookData, mockHeaders),
-      ).rejects.toThrow(
-        new InternalServerErrorException('Failed to process webhook callback'),
-      );
-    });
-
-    it('should process failed webhook callback', async () => {
-      const failedWebhookData = {
-        jobId: 'job-id',
-        status: 'failed' as const,
-        error: 'Processing failed',
-      };
-
-      const result = await controller.processWebhook(
-        failedWebhookData,
-        mockHeaders,
-      );
-
-      expect(
-        mockAudioAnalysisService.processWebhookCallback,
-      ).toHaveBeenCalledWith(failedWebhookData);
-      expect(result).toEqual(expectedResponse);
     });
   });
 });

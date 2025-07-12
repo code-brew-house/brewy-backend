@@ -22,25 +22,52 @@ model User {
   email           String    @unique
   password        String
   fullName        String
+  organizationId  String
+  role            UserRole
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   failedAttempts  Int       @default(0)
   lockedUntil     DateTime?
   lastFailedLogin DateTime?
 
+  organization    Organization @relation(fields: [organizationId], references: [id])
+
   @@index([username])
   @@index([email])
+  @@index([organizationId])
+}
+
+model Organization {
+  id                String    @id @default(uuid())
+  name              String
+  contactNumber     String
+  email             String    @unique
+  totalMemberCount  Int       @default(0)
+  maxUsers          Int       @default(10)
+  maxConcurrentJobs Int       @default(5)
+  archivedAt        DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  users             User[]
+  storage           Storage[]
+  jobs              Job[]
+  analysisResults   AnalysisResult[]
 }
 
 model Storage {
-  id        String   @id @default(uuid())
-  url       String
-  filename  String
-  size      Int
-  mimetype  String
-  timestamp DateTime @default(now())
+  id             String   @id @default(uuid())
+  url            String
+  filename       String
+  size           Int
+  mimetype       String
+  organizationId String
+  timestamp      DateTime @default(now())
   
-  jobs      Job[]
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  jobs           Job[]
+
+  @@index([organizationId])
 }
 
 enum JobStatus {
@@ -50,27 +77,44 @@ enum JobStatus {
   failed
 }
 
+enum UserRole {
+  SUPER_OWNER
+  OWNER
+  ADMIN
+  AGENT
+}
+
 model Job {
-  id          String    @id @default(uuid())
-  status      JobStatus @default(pending)
-  fileId      String
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  startedAt   DateTime?
-  completedAt DateTime?
-  error       String?
+  id             String    @id @default(uuid())
+  status         JobStatus @default(pending)
+  fileId         String
+  organizationId String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  startedAt      DateTime?
+  completedAt    DateTime?
+  error          String?
   
-  storage     Storage   @relation(fields: [fileId], references: [id])
-  results     AnalysisResult[]
+  storage        Storage   @relation(fields: [fileId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  results        AnalysisResult[]
+
+  @@index([organizationId])
+  @@index([organizationId, status])
 }
 
 model AnalysisResult {
-  id          String   @id @default(uuid())
-  jobId       String
-  transcript  String
-  sentiment   String
-  metadata    Json?
-  createdAt   DateTime @default(now())
+  id             String   @id @default(uuid())
+  jobId          String
+  organizationId String
+  transcript     String
+  sentiment      String
+  metadata       Json?
+  createdAt      DateTime @default(now())
   
-  job         Job      @relation(fields: [jobId], references: [id])
+  job            Job      @relation(fields: [jobId], references: [id])
+  organization   Organization @relation(fields: [organizationId], references: [id])
+
+  @@index([organizationId])
+  @@index([organizationId, jobId])
 } 
