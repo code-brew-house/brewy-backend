@@ -3,6 +3,7 @@ import {
   ConflictException,
   UnauthorizedException,
   InternalServerErrorException,
+  BadRequestException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
@@ -14,6 +15,7 @@ import { JwtPayload } from './types/auth.types';
 import { UserResponseDto } from '../user/dto/user-response.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { SecurityLoggerService } from '../../common/services/security-logger.service';
+import { UserRole } from '../user/types/user.types';
 
 /**
  * AuthService handles authentication operations including
@@ -46,16 +48,53 @@ export class AuthService {
         `[AUTH REGISTER] Attempting to register user: ${registerDto.email}`,
       );
 
+      // Determine if this is the first user (Super Owner) registration
+      const existingSuperOwners = await this.prismaService.user.count({
+        where: { role: 'SUPER_OWNER' },
+      });
+
+      let organizationId: string;
+      let userRole: UserRole;
+
+      if (existingSuperOwners === 0) {
+        // First Super Owner registration - create default organization
+        console.log(
+          '[AUTH REGISTER] First Super Owner registration, creating default organization',
+        );
+
+        const organizationData = {
+          name: registerDto.organizationName || 'Default Organization',
+          contactNumber:
+            registerDto.organizationContactNumber || '000-000-0000',
+          email: registerDto.organizationEmail || registerDto.email,
+        };
+
+        const organization = await this.prismaService.organization.create({
+          data: organizationData,
+        });
+
+        organizationId = organization.id;
+        userRole = 'SUPER_OWNER';
+
+        console.log(
+          `[AUTH REGISTER] Created default organization: ${organization.id}`,
+        );
+      } else {
+        // Subsequent registrations require existing organization
+        // For now, we'll throw an error as regular registration should go through invite flow
+        throw new BadRequestException(
+          'Regular user registration should be done through organization invitation',
+        );
+      }
+
       // Create user through UserService (handles validation and duplicate checking)
-      // Note: For regular registration, we'll need to implement organization selection/creation flow
-      // For now, using default values to maintain test compatibility
       const user = await this.userService.create({
         username: registerDto.username,
         email: registerDto.email,
         password: registerDto.password,
         fullName: registerDto.fullName,
-        organizationId: 'default-org-id', // TODO: Implement proper organization flow
-        role: 'ADMIN', // TODO: Determine appropriate default role
+        organizationId: organizationId,
+        role: userRole,
       });
 
       // Generate JWT token with organization context

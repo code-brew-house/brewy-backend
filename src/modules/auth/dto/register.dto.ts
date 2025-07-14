@@ -5,6 +5,7 @@ import {
   IsEmail,
   MinLength,
   Matches,
+  IsOptional,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 
@@ -78,4 +79,37 @@ export class RegisterDto {
     message: 'Full name must end with a letter',
   })
   fullName: string;
+
+  /** Optional organization name for Super Owner registration */
+  @IsOptional()
+  @IsString({ message: 'Organization name must be a string' })
+  @Transform(({ value }: { value: any }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @MinLength(2, {
+    message: 'Organization name must be at least 2 characters long',
+  })
+  @MaxLength(100, {
+    message: 'Organization name must not exceed 100 characters',
+  })
+  organizationName?: string;
+
+  /** Optional organization contact number for Super Owner registration */
+  @IsOptional()
+  @IsString({ message: 'Organization contact number must be a string' })
+  @Transform(({ value }: { value: any }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @MaxLength(20, { message: 'Contact number must not exceed 20 characters' })
+  organizationContactNumber?: string;
+
+  /** Optional organization email for Super Owner registration */
+  @IsOptional()
+  @IsString({ message: 'Organization email must be a string' })
+  @Transform(({ value }: { value: any }) =>
+    typeof value === 'string' ? value.trim().toLowerCase() : value,
+  )
+  @MaxLength(254, { message: 'Organization email address is too long' })
+  @IsEmail({}, { message: 'Please provide a valid organization email address' })
+  organizationEmail?: string;
 }
