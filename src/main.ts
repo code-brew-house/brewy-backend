@@ -33,19 +33,31 @@ async function bootstrap() {
   );
 
   // CORS configuration for API access
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [
+    'http://localhost:3000',
+    'http://localhost:3001',
+    'http://localhost:8080',
+    'http://localhost:4200',
+    'http://localhost:5173',
+    'http://127.0.0.1:3000',
+    'http://127.0.0.1:3001',
+    'http://127.0.0.1:8080',
+    'http://127.0.0.1:4200',
+    'http://127.0.0.1:5173',
+  ];
+
+  console.log('CORS allowed origins:', allowedOrigins);
+
   app.enableCors({
-    origin: process.env.ALLOWED_ORIGINS?.split(',') || [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:8080',
-      'http://localhost:4200',
-      'http://localhost:5173',
-      'http://127.0.0.1:3000',
-      'http://127.0.0.1:3001',
-      'http://127.0.0.1:8080',
-      'http://127.0.0.1:4200',
-      'http://127.0.0.1:5173',
-    ],
+    origin: (origin, callback) => {
+      console.log('CORS request from origin:', origin);
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        console.log('CORS blocked origin:', origin);
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: [
       'Content-Type',
