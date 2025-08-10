@@ -14,6 +14,7 @@ import { PrismaService } from './prisma/prisma.service';
 import { SecurityHeadersMiddleware } from './common/middleware/security-headers.middleware';
 import { AuthExceptionFilter } from './common/filters/auth-exception.filter';
 import { SecurityLoggerService } from './common/services/security-logger.service';
+import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { ValidationLoggingInterceptor } from './common/interceptors/validation-logging.interceptor';
 @Module({
   imports: [
@@ -34,6 +35,10 @@ import { ValidationLoggingInterceptor } from './common/interceptors/validation-l
     {
       provide: APP_FILTER,
       useClass: AuthExceptionFilter,
+    },
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: LoggingInterceptor,
     },
     {
       provide: APP_INTERCEPTOR,

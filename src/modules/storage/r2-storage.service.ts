@@ -14,10 +14,12 @@ export class R2StorageService {
   private readonly s3: S3Client;
   private readonly bucket: string;
   private readonly endpoint: string;
+  private readonly publicUrl: string;
 
   constructor(private readonly configService: ConfigService) {
     this.bucket = this.configService.get<string>('R2_BUCKET_NAME', '');
     this.endpoint = this.configService.get<string>('R2_ENDPOINT_URL', '');
+    this.publicUrl = this.configService.get<string>('R2_PUBLIC_URL', '');
     this.s3 = new S3Client({
       region: 'auto',
       endpoint: this.endpoint,
@@ -54,7 +56,7 @@ export class R2StorageService {
     });
 
     await upload.done();
-    return `${this.endpoint}/${this.bucket}/${key}`;
+    return `${this.publicUrl}/${key}`;
   }
 
   /**
