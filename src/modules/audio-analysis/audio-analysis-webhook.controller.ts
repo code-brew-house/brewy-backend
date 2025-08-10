@@ -83,6 +83,8 @@ export class AudioAnalysisWebhookController {
       }
       
       this.logger.log(`Processing webhook for jobId: ${webhookData.jobId}`);
+      this.logger.log(`JobId details - type: ${typeof webhookData.jobId}, length: ${webhookData.jobId?.length}`);
+      this.logger.log(`JobId raw: '${webhookData.jobId}'`);
       await this.audioAnalysisService.processWebhookCallback(webhookData);
       
       this.logger.log('Webhook processed successfully');

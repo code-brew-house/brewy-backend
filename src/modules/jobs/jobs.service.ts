@@ -3,6 +3,7 @@ import {
   NotFoundException,
   BadRequestException,
   ForbiddenException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JobStatus } from '../../../generated/prisma';
@@ -18,6 +19,8 @@ import {
  */
 @Injectable()
 export class JobsService {
+  private readonly logger = new Logger(JobsService.name);
+
   constructor(private readonly prisma: PrismaService) {}
 
   /**
@@ -377,34 +380,71 @@ export class JobsService {
    * Should only be called from controllers with proper role validation.
    */
   async findJobById(id: string) {
-    const job = await this.prisma.job.findUnique({
-      where: { id },
-      include: {
-        storage: {
-          select: {
-            id: true,
-            filename: true,
-            url: true,
-            size: true,
-            mimetype: true,
-            organizationId: true,
+    this.logger.log(`[FIND_JOB_BY_ID] Searching for job with ID: ${id}`);
+    this.logger.log(`[FIND_JOB_BY_ID] ID type: ${typeof id}, length: ${id?.length}`);
+    
+    try {
+      const job = await this.prisma.job.findUnique({
+        where: { id },
+        include: {
+          storage: {
+            select: {
+              id: true,
+              filename: true,
+              url: true,
+              size: true,
+              mimetype: true,
+              organizationId: true,
+            },
+          },
+          results: true,
+          organization: {
+            select: {
+              id: true,
+              name: true,
+            },
           },
         },
-        results: true,
-        organization: {
-          select: {
-            id: true,
-            name: true,
-          },
-        },
-      },
-    });
+      });
 
-    if (!job) {
-      throw new NotFoundException(`Job with ID ${id} not found`);
+      this.logger.log(`[FIND_JOB_BY_ID] Query result: ${job ? 'FOUND' : 'NOT_FOUND'}`);
+      
+      if (job) {
+        this.logger.log(`[FIND_JOB_BY_ID] Found job: ${job.id}, status: ${job.status}, organizationId: ${job.organizationId}`);
+      } else {
+        // Let's also try to find any jobs with similar IDs for debugging
+        this.logger.log(`[FIND_JOB_BY_ID] Searching for jobs with similar ID patterns...`);
+        const similarJobs = await this.prisma.job.findMany({
+          where: {
+            OR: [
+              { id: { contains: id.substring(0, 8) } },
+              { id: { endsWith: id.substring(-8) } }
+            ]
+          },
+          select: { id: true, status: true },
+          take: 5
+        });
+        this.logger.log(`[FIND_JOB_BY_ID] Similar jobs found: ${JSON.stringify(similarJobs)}`);
+        
+        // Also check if there are any jobs at all
+        const totalJobs = await this.prisma.job.count();
+        this.logger.log(`[FIND_JOB_BY_ID] Total jobs in database: ${totalJobs}`);
+      }
+
+      if (!job) {
+        this.logger.error(`[FIND_JOB_BY_ID] Job with ID ${id} not found`);
+        throw new NotFoundException(`Job with ID ${id} not found`);
+      }
+
+      return job;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(`[FIND_JOB_BY_ID] Database error: ${error.message}`);
+      this.logger.error(`[FIND_JOB_BY_ID] Error stack: ${error.stack}`);
+      throw error;
     }
-
-    return job;
   }
 
   /**
