@@ -33,16 +33,8 @@ export class AudioAnalysisWebhookController {
    */
   @Post('webhook')
   @HttpCode(HttpStatus.OK)
-  @UsePipes(
-    new ValidationPipe({
-      transform: true,
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      validationError: { target: false, value: false },
-    }),
-  )
   async processWebhook(
-    @Body() data: N8NWebhookCallbackDto,
+    @Body() data: any,
     @Headers() headers: Record<string, string>,
   ): Promise<WebhookResponseDto> {
     // Webhook endpoint bypasses organization guards as it's an internal N8N callback
@@ -53,7 +45,9 @@ export class AudioAnalysisWebhookController {
       throw new BadRequestException('Invalid webhook secret');
     }
     try {
-      await this.audioAnalysisService.processWebhookCallback(data);
+      // Handle array format - take the first element if it's an array
+      const webhookData = Array.isArray(data) ? data[0] : data;
+      await this.audioAnalysisService.processWebhookCallback(webhookData);
       return {
         success: true,
         message: 'Webhook processed successfully',

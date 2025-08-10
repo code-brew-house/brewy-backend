@@ -1,5 +1,4 @@
-import { IsString, IsEnum, IsOptional } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { IsString, IsOptional } from 'class-validator';
 
 /**
  * DTO for outgoing webhook payload to N8N
@@ -14,26 +13,11 @@ export interface N8NWebhookPayloadDto {
  * DTO for incoming webhook callback from N8N
  */
 export class N8NWebhookCallbackDto {
-  @IsString()
   jobId: string;
-
-  @IsEnum(['completed', 'failed'])
   status: 'completed' | 'failed';
-
-  @IsOptional()
-  @IsString()
   transcript?: string;
-
-  @IsOptional()
-  @IsString()
   sentiment?: string;
-
-  @IsOptional()
-  @Transform(({ value }) => value || null)
   metadata?: any;
-
-  @IsOptional()
-  @IsString()
   error?: string;
 }
 
