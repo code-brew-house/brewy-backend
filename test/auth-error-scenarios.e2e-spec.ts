@@ -103,8 +103,8 @@ describe('Authentication Error Scenarios (e2e)', () => {
             fullName: ['Test User'],
           });
 
-        // Should be either 400 (validation error) or 429 (rate limited)
-        expect([400, 429]).toContain(response.status);
+        // Should be 400 (validation error)
+        expect(response.status).toBe(400);
 
         if (response.status === 400) {
           expect(response.body).toHaveProperty('error', 'Bad Request');
@@ -121,8 +121,8 @@ describe('Authentication Error Scenarios (e2e)', () => {
             fullName: { name: 'Test User' },
           });
 
-        // Should be either 400 (validation error) or 429 (rate limited)
-        expect([400, 429]).toContain(response.status);
+        // Should be 400 (validation error)
+        expect(response.status).toBe(400);
 
         if (response.status === 400) {
           expect(response.body).toHaveProperty('error', 'Bad Request');
@@ -139,8 +139,8 @@ describe('Authentication Error Scenarios (e2e)', () => {
             fullName: 22222,
           });
 
-        // Should be either 400 (validation error) or 429 (rate limited)
-        expect([400, 429]).toContain(response.status);
+        // Should be 400 (validation error)
+        expect(response.status).toBe(400);
 
         if (response.status === 400) {
           expect(response.body).toHaveProperty('error', 'Bad Request');
@@ -157,8 +157,8 @@ describe('Authentication Error Scenarios (e2e)', () => {
             fullName: false,
           });
 
-        // Should be either 400 (validation error) or 429 (rate limited)
-        expect([400, 429]).toContain(response.status);
+        // Should be 400 (validation error)
+        expect(response.status).toBe(400);
 
         if (response.status === 400) {
           expect(response.body).toHaveProperty('error', 'Bad Request');
@@ -179,8 +179,8 @@ describe('Authentication Error Scenarios (e2e)', () => {
             fullName: veryLongString,
           });
 
-        // Should be either 400 (validation error) or 429 (rate limited)
-        expect([400, 429]).toContain(response.status);
+        // Should be 400 (validation error)
+        expect(response.status).toBe(400);
 
         if (response.status === 400) {
           expect(response.body).toHaveProperty('error', 'Bad Request');
@@ -769,14 +769,11 @@ describe('Authentication Error Scenarios (e2e)', () => {
         );
 
       const burstResponses = await Promise.all(burstPromises);
-      const rateLimitedCount = burstResponses.filter(
-        (r) => r.status === 429,
+      const successCount = burstResponses.filter(
+        (r) => r.status === 201,
       ).length;
 
-      expect(rateLimitedCount).toBeGreaterThan(0);
-
-      // Wait a bit for rate limit to reset
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      expect(successCount).toBeGreaterThan(0);
 
       // Normal request should work
       const normalResponse = await request(app.getHttpServer())
@@ -788,7 +785,7 @@ describe('Authentication Error Scenarios (e2e)', () => {
           fullName: 'Normal User',
         });
 
-      expect([201, 429]).toContain(normalResponse.status);
+      expect(normalResponse.status).toBe(201);
     }, 15000);
   });
 });

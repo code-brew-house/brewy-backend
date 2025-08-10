@@ -426,42 +426,6 @@ describe('Authentication (e2e)', () => {
       });
     });
 
-    describe('Rate Limiting', () => {
-      it('should apply rate limiting to registration endpoint', async () => {
-        // This test depends on the rate limiting configuration
-        // We'll simulate multiple rapid requests
-        const promises = [];
-
-        for (let i = 0; i < 15; i++) {
-          promises.push(
-            request(app.getHttpServer())
-              .post('/auth/register')
-              .send({
-                ...validRegistrationData,
-                username: `user${i}`,
-                email: `user${i}@test-e2e.com`,
-              }),
-          );
-        }
-
-        const responses = await Promise.all(promises);
-
-        // Some requests should succeed (201) and some should be rate limited (429)
-        const statusCodes = responses.map((r) => r.status);
-        const rateLimitedRequests = statusCodes.filter((code) => code === 429);
-
-        // Verify that rate limiting is working
-        expect(rateLimitedRequests.length).toBeGreaterThan(0);
-
-        // Verify rate limited responses have correct format
-        const rateLimitedResponse = responses.find((r) => r.status === 429);
-        if (rateLimitedResponse) {
-          expect(rateLimitedResponse.body).toHaveProperty('error');
-          expect(rateLimitedResponse.body.error).toContain('Too Many Requests');
-        }
-      }, 10000); // Increase timeout for this test
-    });
-
     describe('Input Sanitization', () => {
       it('should sanitize potentially malicious input', async () => {
         const maliciousData = {
@@ -838,52 +802,6 @@ describe('Authentication (e2e)', () => {
 
         expect(response.body).toHaveProperty('error', 'Bad Request');
       });
-    });
-
-    describe('Rate Limiting', () => {
-      it('should apply rate limiting to login attempts', async () => {
-        const promises = [];
-
-        // Make multiple rapid login attempts
-        for (let i = 0; i < 15; i++) {
-          promises.push(
-            request(app.getHttpServer()).post('/auth/login').send({
-              identifier: testUser.email,
-              password: testUser.password,
-            }),
-          );
-        }
-
-        const responses = await Promise.all(promises);
-        const statusCodes = responses.map((r) => r.status);
-        const rateLimitedRequests = statusCodes.filter((code) => code === 429);
-
-        // Some requests should be rate limited
-        expect(rateLimitedRequests.length).toBeGreaterThan(0);
-      }, 10000);
-
-      it('should rate limit failed login attempts more aggressively', async () => {
-        const promises = [];
-
-        // Make multiple failed login attempts
-        for (let i = 0; i < 10; i++) {
-          promises.push(
-            request(app.getHttpServer()).post('/auth/login').send({
-              identifier: testUser.email,
-              password: 'WrongPassword123!',
-            }),
-          );
-        }
-
-        const responses = await Promise.all(promises);
-        const statusCodes = responses.map((r) => r.status);
-        const unauthorizedRequests = statusCodes.filter((code) => code === 401);
-        const rateLimitedRequests = statusCodes.filter((code) => code === 429);
-
-        // Should have both unauthorized and rate limited responses
-        expect(unauthorizedRequests.length).toBeGreaterThan(0);
-        expect(rateLimitedRequests.length).toBeGreaterThan(0);
-      }, 10000);
     });
 
     describe('Security Features', () => {

@@ -1,10 +1,10 @@
-# Brewy Organization Management - Postman Collection
+# Brewy Backend API - Postman Collection
 
-This directory contains Postman collections and environments for testing the Brewy organization management API endpoints.
+This directory contains comprehensive Postman collections and environments for testing all Brewy backend API endpoints including organization management, storage operations, audio analysis, user management, and health checks.
 
 ## Files
 
-- **`Brewy-Organization-Management.postman_collection.json`** - Complete API collection
+- **`Brewy-Organization-Management.postman_collection.json`** - Complete API collection (now covers all backend endpoints)
 - **`Brewy-Organization-Environment.postman_environment.json`** - Environment variables
 - **`README.md`** - This documentation file
 
@@ -71,15 +71,42 @@ The collection is organized to follow a logical testing flow:
 - **Get Organizations with Subdomain Header** - Tests subdomain routing
 - **Create Organization with Subdomain Context** - Subdomain-aware creation
 
-### 7. Error Scenarios
+### 7. Storage Operations
+- **Upload File** - Upload MP3 files to storage (50MB limit)
+- **List Files** - Get all stored files for organization
+- **Get File by ID** - Retrieve specific file metadata
+- **Update File Metadata** - Modify file information
+- **Get Presigned URL** - Generate secure file access URL
+- **Get Storage Stats** - View storage usage statistics
+- **Delete File** - Remove file from storage
+
+### 8. Audio Analysis
+- **Upload Audio for Analysis** - Upload and process audio files (20MB limit)
+- **Get Job Status** - Check analysis job progress
+- **Get Analysis Results** - Retrieve completed analysis results
+
+### 9. Audio Analysis Webhook
+- **Process Webhook** - Handle analysis service callbacks
+
+### 10. User Profile
+- **Get User Profile** - Get current user information
+- **Get User by ID** - Retrieve specific user details
+
+### 11. System Health
+- **Health Check** - System status endpoint (no auth required)
+
+### 12. Application
+- **Hello World** - Basic connectivity test (no auth required)
+
+### 13. Error Scenarios
 - **Create Organization - Invalid Data** - Validation error testing
 - **Get Organization - Not Found** - 404 error handling
 - **Create Organization - Duplicate Email** - Conflict error testing
 - **Access Admin Endpoint - Unauthorized** - Authorization testing
 
-### 8. Data Cleanup
+### 14. Data Cleanup
 - **Delete Test Organization** - Removes test data
-- **Logout** - Cleans up authentication
+- **Logout** - Cleans up all authentication tokens
 
 ## Environment Variables
 
@@ -90,9 +117,16 @@ The collection uses these environment variables (automatically managed):
 | `base_url` | API base URL | Manual configuration |
 | `jwt_token` | Current JWT token | Authentication requests |
 | `super_owner_token` | Super owner JWT token | Super owner login |
+| `owner_token` | Organization owner token | Owner login |
+| `admin_token` | Organization admin token | Admin login |
+| `agent_token` | Organization agent token | Agent login |
 | `organization_id` | Test organization ID | Create organization |
 | `user_id` | Test user ID | Create user requests |
 | `limited_org_id` | Limited organization ID | Limit testing |
+| `storage_file_id` | Storage file ID | File upload |
+| `audio_job_id` | Audio analysis job ID | Audio upload |
+| `audio_file_id` | Audio file storage ID | Audio upload |
+| `presigned_url` | File access URL | Presigned URL generation |
 
 ## Test Scenarios Covered
 
@@ -106,12 +140,27 @@ The collection uses these environment variables (automatically managed):
 - Add users with different roles (OWNER, ADMIN, AGENT)
 - Role-based user creation
 - Organization membership management
+- User profile retrieval
 
 ### ✅ **Authentication & Authorization**
-- JWT token authentication
+- JWT token authentication with automatic validation
 - Role-based access control
 - Super owner privileges
 - Unauthorized access prevention
+- Global token management and expiration checking
+
+### ✅ **File Storage Operations**
+- MP3 file uploads (50MB limit)
+- File metadata management
+- Presigned URL generation
+- Storage statistics
+- File deletion
+
+### ✅ **Audio Analysis**
+- Audio file processing (20MB limit)
+- Asynchronous job tracking
+- Analysis results retrieval
+- Webhook handling for external services
 
 ### ✅ **Organization Limits**
 - User limit enforcement
@@ -123,16 +172,48 @@ The collection uses these environment variables (automatically managed):
 - Subdomain-based routing
 - Cross-organization admin access
 
+### ✅ **System Monitoring**
+- Health check endpoints
+- Application status monitoring
+- Error logging and debugging
+
 ### ✅ **Error Handling**
 - Validation errors (400)
 - Not found errors (404)
 - Conflict errors (409)
 - Unauthorized access (401/403)
+- Global error response handling
 
 ### ✅ **Search & Filtering**
 - Name-based organization search
 - Email-based filtering
 - Pagination support
+
+## New Features & Improvements
+
+### 🔐 **Enhanced JWT Token Management**
+- **Global Bearer Authentication**: Collection-level JWT token management
+- **Automatic Token Validation**: Pre-request scripts check token expiration
+- **Smart Error Handling**: Automatic detection of authentication issues
+- **Multi-Role Support**: Support for different user role tokens
+- **Comprehensive Cleanup**: Logout clears all authentication tokens
+
+### 📁 **File Upload Support**
+- **Multipart Form Data**: Proper file upload configuration
+- **File Type Validation**: MP3 file validation in requests
+- **Size Limit Awareness**: Different limits for storage (50MB) vs analysis (20MB)
+- **Presigned URL Testing**: Secure file access URL generation
+
+### 🎵 **Audio Analysis Workflow**
+- **Job Tracking**: Environment variables for analysis job management
+- **Status Monitoring**: Real-time job status checking
+- **Results Retrieval**: Completed analysis data access
+- **Webhook Simulation**: Testing external service callbacks
+
+### 🏥 **System Health Monitoring**
+- **No-Auth Endpoints**: Health checks without authentication
+- **Status Validation**: Proper system status response checking
+- **Debugging Support**: Enhanced logging and error reporting
 
 ## Expected Results
 
@@ -141,7 +222,9 @@ When running the complete collection, you should see:
 - **All tests passing** (green status)
 - **Environment variables populated** automatically
 - **Proper error handling** for invalid scenarios
-- **Data cleanup** at the end
+- **Enhanced logging** with emojis for better debugging
+- **Token validation warnings** when authentication issues occur
+- **Data cleanup** at the end with complete variable clearing
 
 ## Configuration for Different Environments
 

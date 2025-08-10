@@ -113,26 +113,18 @@ describe('Performance Tests (e2e)', () => {
       console.log(`Actual: Response time = ${responseTime}ms`);
       console.log(`Status: ${response.status}`);
 
-      // Verify the request succeeded (if not rate limited)
-      if (response.status === 200) {
-        expect(response.body).toHaveProperty('valid', true);
-        expect(response.body).toHaveProperty('user');
+      // Verify the request succeeded
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('valid', true);
+      expect(response.body).toHaveProperty('user');
 
-        if (responseTime <= MAX_RESPONSE_TIME) {
-          console.log(
-            '✅ PASS: Token validation meets PRD performance requirement',
-          );
-        } else {
-          console.log(
-            `⚠️  PERFORMANCE NOTE: Token validation took ${responseTime}ms, exceeds PRD target of ${MAX_RESPONSE_TIME}ms`,
-          );
-        }
+      if (responseTime <= MAX_RESPONSE_TIME) {
+        console.log(
+          '✅ PASS: Token validation meets PRD performance requirement',
+        );
       } else {
         console.log(
-          `⚠️  REQUEST BLOCKED: Status ${response.status} (likely rate limiting)`,
-        );
-        console.log(
-          `   Response time was ${responseTime}ms before being blocked`,
+          `⚠️  PERFORMANCE NOTE: Token validation took ${responseTime}ms, exceeds PRD target of ${MAX_RESPONSE_TIME}ms`,
         );
       }
 
@@ -172,26 +164,18 @@ describe('Performance Tests (e2e)', () => {
       console.log(`Actual: Response time = ${responseTime}ms`);
       console.log(`Status: ${response.status}`);
 
-      // Verify the request succeeded (if not rate limited)
-      if (response.status === 200) {
-        expect(response.body).toHaveProperty('id');
-        expect(response.body).toHaveProperty('email');
+      // Verify the request succeeded
+      expect(response.status).toBe(200);
+      expect(response.body).toHaveProperty('id');
+      expect(response.body).toHaveProperty('email');
 
-        if (responseTime <= MAX_RESPONSE_TIME) {
-          console.log(
-            '✅ PASS: Protected route access meets PRD performance requirement',
-          );
-        } else {
-          console.log(
-            `⚠️  PERFORMANCE NOTE: Protected route access took ${responseTime}ms, exceeds PRD target of ${MAX_RESPONSE_TIME}ms`,
-          );
-        }
+      if (responseTime <= MAX_RESPONSE_TIME) {
+        console.log(
+          '✅ PASS: Protected route access meets PRD performance requirement',
+        );
       } else {
         console.log(
-          `⚠️  REQUEST BLOCKED: Status ${response.status} (likely rate limiting)`,
-        );
-        console.log(
-          `   Response time was ${responseTime}ms before being blocked`,
+          `⚠️  PERFORMANCE NOTE: Protected route access took ${responseTime}ms, exceeds PRD target of ${MAX_RESPONSE_TIME}ms`,
         );
       }
 

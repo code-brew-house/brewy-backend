@@ -1,8 +1,8 @@
 {
   "info": {
-    "name": "Brewy Organization Management",
-    "description": "Complete API collection for Brewy organization management endpoints including authentication, CRUD operations, user management, and admin functions.",
-    "version": "1.0.0",
+    "name": "Brewy Backend API Collection",
+    "description": "Complete API collection for Brewy backend services including authentication, organization management, storage operations, audio analysis, user management, and health checks. Features global JWT token management and comprehensive endpoint coverage.",
+    "version": "2.0.0",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -24,6 +24,59 @@
           "// Set base URL if not already set",
           "if (!pm.environment.get('base_url')) {",
           "    pm.environment.set('base_url', 'http://localhost:3000');",
+          "}",
+          "",
+          "// Global token management",
+          "// Check if we have a valid JWT token for authenticated requests",
+          "const requestName = pm.info.requestName;",
+          "const isAuthRequired = !['Health Check', 'Hello World'].includes(requestName);",
+          "",
+          "if (isAuthRequired) {",
+          "    const jwtToken = pm.environment.get('jwt_token');",
+          "    ",
+          "    if (!jwtToken) {",
+          "        console.log('⚠️ No JWT token found. Please run authentication endpoints first.');",
+          "    } else {",
+          "        // Check if token is expired (basic check)",
+          "        try {",
+          "            const tokenParts = jwtToken.split('.');",
+          "            if (tokenParts.length === 3) {",
+          "                const payload = JSON.parse(atob(tokenParts[1]));",
+          "                const currentTime = Math.floor(Date.now() / 1000);",
+          "                ",
+          "                if (payload.exp && payload.exp < currentTime) {",
+          "                    console.log('⚠️ JWT token has expired. Please re-authenticate.');",
+          "                    pm.environment.unset('jwt_token');",
+          "                }",
+          "            }",
+          "        } catch (e) {",
+          "            console.log('⚠️ Invalid JWT token format.');",
+          "        }",
+          "    }",
+          "}",
+          "",
+          "// Log current request info for debugging",
+          "console.log(`🚀 Making request to: ${pm.request.url}`);"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global response logging and error handling",
+          "console.log(`✅ Response status: ${pm.response.status} ${pm.response.reason()}`);",
+          "",
+          "// Handle common error responses",
+          "if (pm.response.code === 401) {",
+          "    console.log('🔒 Authentication required. Token may be invalid or expired.');",
+          "} else if (pm.response.code === 403) {",
+          "    console.log('🚫 Access forbidden. Check user permissions.');",
+          "} else if (pm.response.code === 404) {",
+          "    console.log('🔍 Resource not found.');",
+          "} else if (pm.response.code >= 400) {",
+          "    console.log('❌ Request failed with error:', pm.response.text());",
           "}"
         ]
       }
@@ -937,9 +990,16 @@
                   "// Clear environment variables",
                   "pm.environment.unset('jwt_token');",
                   "pm.environment.unset('super_owner_token');",
+                  "pm.environment.unset('owner_token');",
+                  "pm.environment.unset('admin_token');",
+                  "pm.environment.unset('agent_token');",
                   "pm.environment.unset('organization_id');",
                   "pm.environment.unset('user_id');",
-                  "pm.environment.unset('limited_org_id');"
+                  "pm.environment.unset('limited_org_id');",
+                  "pm.environment.unset('storage_file_id');",
+                  "pm.environment.unset('audio_job_id');",
+                  "pm.environment.unset('audio_file_id');",
+                  "pm.environment.unset('presigned_url');"
                 ]
               }
             }
@@ -951,6 +1011,537 @@
               "raw": "{{base_url}}/auth/logout",
               "host": ["{{base_url}}"],
               "path": ["auth", "logout"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Storage",
+      "item": [
+        {
+          "name": "Upload File",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has file data', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.expect(jsonData).to.have.property('filename');",
+                  "    pm.expect(jsonData).to.have.property('url');",
+                  "    pm.environment.set('storage_file_id', jsonData.id);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/storage/upload",
+              "host": ["{{base_url}}"],
+              "path": ["storage", "upload"]
+            }
+          }
+        },
+        {
+          "name": "List Files",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response is array', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/storage",
+              "host": ["{{base_url}}"],
+              "path": ["storage"]
+            }
+          }
+        },
+        {
+          "name": "Get File by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has file data', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.expect(jsonData).to.have.property('filename');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/storage/{{storage_file_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["storage", "{{storage_file_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Update File Metadata",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('File metadata updated', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"filename\": \"updated-filename.mp3\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/storage/{{storage_file_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["storage", "{{storage_file_id}}"]
+            }
+          }
+        },
+        {
+          "name": "Get Presigned URL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has presigned URL', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('url');",
+                  "    pm.environment.set('presigned_url', jsonData.url);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/storage/{{storage_file_id}}/presigned-url",
+              "host": ["{{base_url}}"],
+              "path": ["storage", "{{storage_file_id}}", "presigned-url"]
+            }
+          }
+        },
+        {
+          "name": "Get Storage Stats",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has stats', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('totalFiles');",
+                  "    pm.expect(jsonData).to.have.property('totalSize');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/storage/stats",
+              "host": ["{{base_url}}"],
+              "path": ["storage", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Delete File",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('File deleted successfully', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.id).to.equal(pm.environment.get('storage_file_id'));",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/storage/{{storage_file_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["storage", "{{storage_file_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Audio Analysis",
+      "item": [
+        {
+          "name": "Upload Audio for Analysis",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "",
+                  "pm.test('Response has job data', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('jobId');",
+                  "    pm.expect(jsonData).to.have.property('storageId');",
+                  "    pm.expect(jsonData).to.have.property('status');",
+                  "    pm.environment.set('audio_job_id', jsonData.jobId);",
+                  "    pm.environment.set('audio_file_id', jsonData.storageId);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": []
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/audio-analysis/upload",
+              "host": ["{{base_url}}"],
+              "path": ["audio-analysis", "upload"]
+            }
+          }
+        },
+        {
+          "name": "Get Job Status",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has job status', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('jobId');",
+                  "    pm.expect(jsonData).to.have.property('status');",
+                  "    pm.expect(jsonData).to.have.property('createdAt');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/audio-analysis/job/{{audio_job_id}}/status",
+              "host": ["{{base_url}}"],
+              "path": ["audio-analysis", "job", "{{audio_job_id}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Get Analysis Results",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has analysis results', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('jobId');",
+                  "    pm.expect(jsonData).to.have.property('status');",
+                  "    if (jsonData.status === 'COMPLETED') {",
+                  "        pm.expect(jsonData).to.have.property('results');",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/audio-analysis/job/{{audio_job_id}}/results",
+              "host": ["{{base_url}}"],
+              "path": ["audio-analysis", "job", "{{audio_job_id}}", "results"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Audio Analysis Webhook",
+      "item": [
+        {
+          "name": "Process Webhook",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has success message', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": \"{{audio_job_id}}\",\n  \"status\": \"COMPLETED\",\n  \"results\": {\n    \"transcript\": \"Sample transcript from webhook\",\n    \"sentiment\": \"positive\",\n    \"confidence\": 0.95\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/audio-analysis/webhook",
+              "host": ["{{base_url}}"],
+              "path": ["audio-analysis", "webhook"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "User",
+      "item": [
+        {
+          "name": "Get User Profile",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has user data', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.expect(jsonData).to.have.property('email');",
+                  "    pm.expect(jsonData).to.have.property('username');",
+                  "    pm.expect(jsonData).to.have.property('role');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/user/profile",
+              "host": ["{{base_url}}"],
+              "path": ["user", "profile"]
+            }
+          }
+        },
+        {
+          "name": "Get User by ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has user data', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('id');",
+                  "    pm.expect(jsonData).to.have.property('email');",
+                  "    pm.expect(jsonData).to.have.property('username');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/user/{{user_id}}",
+              "host": ["{{base_url}}"],
+              "path": ["user", "{{user_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has health status', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('status');",
+                  "    pm.expect(jsonData.status).to.equal('ok');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "App",
+      "item": [
+        {
+          "name": "Hello World",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has hello message', function () {",
+                  "    var responseText = pm.response.text();",
+                  "    pm.expect(responseText).to.include('Hello');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/",
+              "host": ["{{base_url}}"],
+              "path": [""]
             }
           }
         }

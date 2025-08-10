@@ -251,27 +251,6 @@ describe('SecurityLoggerService', () => {
     });
   });
 
-  describe('logRateLimitExceeded', () => {
-    it('should log rate limit exceeded with correct data', () => {
-      const consoleSpy = jest.spyOn(console, 'warn');
-
-      service.logRateLimitExceeded(
-        '127.0.0.1',
-        'Mozilla/5.0',
-        '/auth/login',
-        'POST',
-        'auth',
-      );
-
-      expect(consoleSpy).toHaveBeenCalledWith(
-        '[SECURITY-MEDIUM]',
-        expect.stringContaining(
-          'Rate limit exceeded for auth on POST /auth/login',
-        ),
-      );
-    });
-  });
-
   describe('logSuspiciousActivity', () => {
     it('should log suspicious activity with high severity', () => {
       const consoleSpy = jest.spyOn(console, 'error');

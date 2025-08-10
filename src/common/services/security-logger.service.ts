@@ -29,8 +29,6 @@ export enum SecurityEventType {
   FORBIDDEN_ACCESS = 'FORBIDDEN_ACCESS',
   PROTECTED_ROUTE_ACCESS = 'PROTECTED_ROUTE_ACCESS',
 
-  // Rate Limiting Events
-  RATE_LIMIT_EXCEEDED = 'RATE_LIMIT_EXCEEDED',
   SUSPICIOUS_ACTIVITY = 'SUSPICIOUS_ACTIVITY',
 
   // Security Events
@@ -291,29 +289,6 @@ export class SecurityLoggerService {
       endpoint,
       method,
       message: `Unauthorized access attempt to ${method} ${endpoint}: ${reason}`,
-      timestamp: new Date(),
-    });
-  }
-
-  /**
-   * Log rate limit exceeded event
-   */
-  logRateLimitExceeded(
-    ipAddress: string,
-    userAgent: string,
-    endpoint: string,
-    method: string,
-    limitType: string,
-  ): void {
-    this.logSecurityEvent({
-      type: SecurityEventType.RATE_LIMIT_EXCEEDED,
-      severity: SecurityEventSeverity.MEDIUM,
-      ipAddress,
-      userAgent,
-      endpoint,
-      method,
-      message: `Rate limit exceeded for ${limitType} on ${method} ${endpoint}`,
-      metadata: { limitType },
       timestamp: new Date(),
     });
   }

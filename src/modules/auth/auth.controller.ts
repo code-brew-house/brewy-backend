@@ -14,7 +14,6 @@ import {
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
-import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { JwtValidationService } from './services/jwt-validation.service';
 import { RegisterDto } from './dto/register.dto';
@@ -39,13 +38,11 @@ export class AuthController {
 
   /**
    * Register a new user
-   * Rate limited to 3 attempts per 10 minutes per IP
    * @param registerDto - User registration data
    * @returns Authentication response with token and user data
    */
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
-  @Throttle({ register: { limit: 3, ttl: 600000 } })
   @UsePipes(
     new ValidationPipe({
       transform: true,
@@ -77,13 +74,11 @@ export class AuthController {
 
   /**
    * Login with email/username and password
-   * Rate limited to 5 attempts per 15 minutes per IP
    * @param loginDto - Login credentials
    * @returns Authentication response with token and user data
    */
   @Post('login')
   @HttpCode(HttpStatus.OK)
-  @Throttle({ auth: { limit: 5, ttl: 900000 } })
   @UsePipes(
     new ValidationPipe({
       transform: true,

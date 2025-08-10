@@ -400,46 +400,6 @@ describe('User Management (e2e)', () => {
     });
   });
 
-  describe('Rate Limiting on User Endpoints', () => {
-    it('should apply rate limiting to profile endpoint', async () => {
-      const promises = Array(20)
-        .fill(null)
-        .map(() =>
-          request(app.getHttpServer())
-            .get('/users/profile')
-            .set('Authorization', `Bearer ${accessToken}`),
-        );
-
-      const responses = await Promise.all(promises);
-      const statusCodes = responses.map((r) => r.status);
-      const rateLimitedCount = statusCodes.filter(
-        (code) => code === 429,
-      ).length;
-
-      // Some requests should be rate limited
-      expect(rateLimitedCount).toBeGreaterThan(0);
-    }, 10000);
-
-    it('should apply rate limiting to user by ID endpoint', async () => {
-      const promises = Array(20)
-        .fill(null)
-        .map(() =>
-          request(app.getHttpServer())
-            .get(`/users/${testUserId}`)
-            .set('Authorization', `Bearer ${accessToken}`),
-        );
-
-      const responses = await Promise.all(promises);
-      const statusCodes = responses.map((r) => r.status);
-      const rateLimitedCount = statusCodes.filter(
-        (code) => code === 429,
-      ).length;
-
-      // Some requests should be rate limited
-      expect(rateLimitedCount).toBeGreaterThan(0);
-    }, 10000);
-  });
-
   describe('Security Headers', () => {
     it('should include security headers in user profile response', async () => {
       const response = await request(app.getHttpServer())
@@ -509,9 +469,9 @@ describe('User Management (e2e)', () => {
       const responses = await Promise.all(promises);
       const responseTime = Date.now() - startTime;
 
-      // All requests should succeed (or be rate limited)
+      // All requests should succeed
       responses.forEach((response) => {
-        expect([200, 429]).toContain(response.status);
+        expect(response.status).toBe(200);
       });
 
       // Total time should be reasonable for concurrent requests

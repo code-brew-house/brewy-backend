@@ -329,31 +329,6 @@ describe('Protected Routes (e2e)', () => {
       });
     });
 
-    describe('Rate Limiting on Protected Routes', () => {
-      it('should apply rate limiting to protected routes', async () => {
-        const promises = [];
-
-        // Make multiple rapid requests to protected route
-        for (let i = 0; i < 15; i++) {
-          promises.push(
-            request(app.getHttpServer())
-              .post('/auth/logout')
-              .set('Authorization', `Bearer ${validToken}`),
-          );
-        }
-
-        const responses = await Promise.all(promises);
-        const statusCodes = responses.map((r) => r.status);
-
-        // Should have some successful requests and some rate limited
-        const successfulRequests = statusCodes.filter((code) => code === 200);
-        const rateLimitedRequests = statusCodes.filter((code) => code === 429);
-
-        expect(successfulRequests.length).toBeGreaterThan(0);
-        expect(rateLimitedRequests.length).toBeGreaterThan(0);
-      }, 10000);
-    });
-
     describe('Concurrent Access Protection', () => {
       it('should handle concurrent protected route access', async () => {
         const promises = [];
