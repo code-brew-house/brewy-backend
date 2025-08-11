@@ -46,15 +46,56 @@ export class AudioAnalysisService {
     try {
       const n8nResponse = await this.n8nWebhookService.triggerWebhook(payload);
 
+      // Log the complete N8N response for debugging
+      this.logger.log(
+        `N8N Response - Type: ${typeof n8nResponse}, Content: ${JSON.stringify(n8nResponse, null, 2)}`,
+      );
+
       // Extract transcriptId from N8N response and store as externalReferenceId
-      if (n8nResponse && n8nResponse.transcriptId) {
-        this.logger.log(
-          `N8N returned transcriptId: ${n8nResponse.transcriptId}`,
-        );
-        await this.jobsService.updateExternalReferenceId(
-          job.id,
-          n8nResponse.transcriptId,
-        );
+      let extractedId: string | null = null;
+      let propertyName: string | null = null;
+
+      if (n8nResponse) {
+        // Check multiple possible property names for the transcript ID
+        const possibleProperties = [
+          'transcriptId',
+          'transcript_id',
+          'id',
+          'referenceId',
+          'reference_id',
+          'externalId',
+          'external_id',
+        ];
+
+        for (const prop of possibleProperties) {
+          if (n8nResponse[prop] && typeof n8nResponse[prop] === 'string') {
+            extractedId = n8nResponse[prop];
+            propertyName = prop;
+            this.logger.log(
+              `Found reference ID using property '${prop}': ${extractedId}`,
+            );
+            break;
+          }
+        }
+
+        if (extractedId) {
+          this.logger.log(
+            `Saving externalReferenceId for job ${job.id}: ${extractedId} (from property: ${propertyName})`,
+          );
+          await this.jobsService.updateExternalReferenceId(job.id, extractedId);
+          this.logger.log(
+            `Successfully saved externalReferenceId: ${extractedId}`,
+          );
+        } else {
+          this.logger.warn(
+            `No valid reference ID found in N8N response. Checked properties: ${possibleProperties.join(', ')}`,
+          );
+          this.logger.warn(
+            `Available properties in response: ${Object.keys(n8nResponse).join(', ')}`,
+          );
+        }
+      } else {
+        this.logger.warn('N8N response is null or undefined');
       }
 
       await this.jobsService.updateStatus(job.id, JobStatus.processing);
