@@ -13,7 +13,8 @@ export interface N8NWebhookPayloadDto {
  * DTO for incoming webhook callback from N8N
  */
 export class N8NWebhookCallbackDto {
-  jobId: string;
+  jobId?: string;
+  externalReferenceId?: string;
   status: 'completed' | 'failed';
   transcript?: string;
   sentiment?: string;

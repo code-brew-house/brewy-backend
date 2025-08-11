@@ -61,4 +61,11 @@ export class Job {
   @IsOptional()
   @IsString()
   error: string | null;
+
+  /**
+   * External reference ID from the upstream service (e.g., transcriptId from N8N)
+   */
+  @IsOptional()
+  @IsString()
+  externalReferenceId: string | null;
 }

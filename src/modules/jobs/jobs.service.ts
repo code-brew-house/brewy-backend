@@ -143,6 +143,84 @@ export class JobsService {
   }
 
   /**
+   * Update job's external reference ID
+   */
+  async updateExternalReferenceId(id: string, externalReferenceId: string) {
+    const job = await this.prisma.job.update({
+      where: { id },
+      data: { externalReferenceId },
+    });
+
+    this.logger.log(
+      `[JOB UPDATE] Updated externalReferenceId for job ${id}: ${externalReferenceId}`,
+    );
+    return job;
+  }
+
+  /**
+   * Find a job by its external reference ID (transcriptId from N8N)
+   * This method has SUPER_OWNER access as it's used by webhook callbacks
+   */
+  async findByExternalReferenceId(externalReferenceId: string) {
+    this.logger.log(
+      `[FIND_BY_EXT_REF] Searching for job with externalReferenceId: ${externalReferenceId}`,
+    );
+
+    try {
+      const job = await this.prisma.job.findFirst({
+        where: { externalReferenceId },
+        include: {
+          storage: {
+            select: {
+              id: true,
+              filename: true,
+              url: true,
+              size: true,
+              mimetype: true,
+              organizationId: true,
+            },
+          },
+          results: true,
+          organization: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      });
+
+      this.logger.log(
+        `[FIND_BY_EXT_REF] Query result: ${job ? 'FOUND' : 'NOT_FOUND'}`,
+      );
+
+      if (job) {
+        this.logger.log(
+          `[FIND_BY_EXT_REF] Found job: ${job.id}, status: ${job.status}`,
+        );
+      }
+
+      if (!job) {
+        this.logger.error(
+          `[FIND_BY_EXT_REF] Job with externalReferenceId ${externalReferenceId} not found`,
+        );
+        throw new NotFoundException(
+          `Job with externalReferenceId ${externalReferenceId} not found`,
+        );
+      }
+
+      return job;
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw error;
+      }
+      this.logger.error(`[FIND_BY_EXT_REF] Database error: ${error.message}`);
+      this.logger.error(`[FIND_BY_EXT_REF] Error stack: ${error.stack}`);
+      throw error;
+    }
+  }
+
+  /**
    * Find all jobs with optional filtering by organization and status
    * organizationId is required for data security - use findAllJobs() for SUPER_OWNER access.
    */
@@ -381,8 +459,10 @@ export class JobsService {
    */
   async findJobById(id: string) {
     this.logger.log(`[FIND_JOB_BY_ID] Searching for job with ID: ${id}`);
-    this.logger.log(`[FIND_JOB_BY_ID] ID type: ${typeof id}, length: ${id?.length}`);
-    
+    this.logger.log(
+      `[FIND_JOB_BY_ID] ID type: ${typeof id}, length: ${id?.length}`,
+    );
+
     try {
       const job = await this.prisma.job.findUnique({
         where: { id },
@@ -407,28 +487,38 @@ export class JobsService {
         },
       });
 
-      this.logger.log(`[FIND_JOB_BY_ID] Query result: ${job ? 'FOUND' : 'NOT_FOUND'}`);
-      
+      this.logger.log(
+        `[FIND_JOB_BY_ID] Query result: ${job ? 'FOUND' : 'NOT_FOUND'}`,
+      );
+
       if (job) {
-        this.logger.log(`[FIND_JOB_BY_ID] Found job: ${job.id}, status: ${job.status}, organizationId: ${job.organizationId}`);
+        this.logger.log(
+          `[FIND_JOB_BY_ID] Found job: ${job.id}, status: ${job.status}, organizationId: ${job.organizationId}`,
+        );
       } else {
         // Let's also try to find any jobs with similar IDs for debugging
-        this.logger.log(`[FIND_JOB_BY_ID] Searching for jobs with similar ID patterns...`);
+        this.logger.log(
+          `[FIND_JOB_BY_ID] Searching for jobs with similar ID patterns...`,
+        );
         const similarJobs = await this.prisma.job.findMany({
           where: {
             OR: [
               { id: { contains: id.substring(0, 8) } },
-              { id: { endsWith: id.substring(-8) } }
-            ]
+              { id: { endsWith: id.substring(-8) } },
+            ],
           },
           select: { id: true, status: true },
-          take: 5
+          take: 5,
         });
-        this.logger.log(`[FIND_JOB_BY_ID] Similar jobs found: ${JSON.stringify(similarJobs)}`);
-        
+        this.logger.log(
+          `[FIND_JOB_BY_ID] Similar jobs found: ${JSON.stringify(similarJobs)}`,
+        );
+
         // Also check if there are any jobs at all
         const totalJobs = await this.prisma.job.count();
-        this.logger.log(`[FIND_JOB_BY_ID] Total jobs in database: ${totalJobs}`);
+        this.logger.log(
+          `[FIND_JOB_BY_ID] Total jobs in database: ${totalJobs}`,
+        );
       }
 
       if (!job) {

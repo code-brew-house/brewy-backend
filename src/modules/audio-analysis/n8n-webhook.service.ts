@@ -20,13 +20,14 @@ export class N8NWebhookService {
   /**
    * Triggers the N8N webhook with the given payload.
    * @param payload The data to send to N8N
+   * @returns The response data from N8N, including transcriptId if available
    */
-  async triggerWebhook(payload: N8NWebhookPayloadDto): Promise<void> {
+  async triggerWebhook(payload: N8NWebhookPayloadDto): Promise<any> {
     if (!this.webhookUrl) {
       this.logger.warn(
         'N8N_WEBHOOK_URL not configured, skipping webhook trigger',
       );
-      return;
+      return null;
     }
     try {
       const headers: Record<string, string> = {
@@ -41,6 +42,10 @@ export class N8NWebhookService {
       });
       if (response.status >= 200 && response.status < 300) {
         this.logger.log('N8N webhook triggered successfully');
+        this.logger.log(
+          `N8N webhook response data: ${JSON.stringify(response.data)}`,
+        );
+        return response.data;
       } else {
         this.logger.error(
           'N8N webhook non-2xx response',

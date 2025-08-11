@@ -44,7 +44,19 @@ export class AudioAnalysisService {
       timestamp: new Date().toISOString(),
     };
     try {
-      await this.n8nWebhookService.triggerWebhook(payload);
+      const n8nResponse = await this.n8nWebhookService.triggerWebhook(payload);
+
+      // Extract transcriptId from N8N response and store as externalReferenceId
+      if (n8nResponse && n8nResponse.transcriptId) {
+        this.logger.log(
+          `N8N returned transcriptId: ${n8nResponse.transcriptId}`,
+        );
+        await this.jobsService.updateExternalReferenceId(
+          job.id,
+          n8nResponse.transcriptId,
+        );
+      }
+
       await this.jobsService.updateStatus(job.id, JobStatus.processing);
     } catch (error) {
       this.logger.error(
@@ -214,29 +226,67 @@ export class AudioAnalysisService {
    * This method bypasses organization validation as it's called by internal N8N service
    */
   async processWebhookCallback(data: {
-    jobId: string;
+    jobId?: string;
+    externalReferenceId?: string;
     status: 'completed' | 'failed';
     transcript?: string;
     sentiment?: string;
     metadata?: any;
     error?: string;
   }) {
-    const { jobId, status, transcript, sentiment, metadata, error } = data;
-    // For webhook callbacks, we use SUPER_OWNER access as N8N is internal
-    const job = await this.jobsService.findJobById(jobId);
+    const {
+      jobId,
+      externalReferenceId,
+      status,
+      transcript,
+      sentiment,
+      metadata,
+      error,
+    } = data;
+
+    // Find job by externalReferenceId first, then fallback to jobId
+    let job;
+    let lookupMethod: string;
+
+    if (externalReferenceId) {
+      this.logger.log(
+        `Looking up job by externalReferenceId: ${externalReferenceId}`,
+      );
+      job =
+        await this.jobsService.findByExternalReferenceId(externalReferenceId);
+      lookupMethod = 'externalReferenceId';
+    } else if (jobId) {
+      this.logger.log(`Looking up job by jobId: ${jobId}`);
+      job = await this.jobsService.findJobById(jobId);
+      lookupMethod = 'jobId';
+    } else {
+      this.logger.error(
+        'Neither externalReferenceId nor jobId provided in webhook callback',
+      );
+      throw new BadRequestException(
+        'Missing both externalReferenceId and jobId in webhook callback',
+      );
+    }
+
     if (!job) {
-      this.logger.warn(`Webhook callback for non-existent job: ${jobId}`);
+      this.logger.warn(
+        `Webhook callback for non-existent job using ${lookupMethod}: ${externalReferenceId || jobId}`,
+      );
       throw new BadRequestException('Job not found');
     }
+
+    this.logger.log(
+      `Found job ${job.id} using ${lookupMethod}: ${externalReferenceId || jobId}`,
+    );
     if (status === 'completed') {
       if (!transcript || !sentiment) {
         await this.jobsService.updateStatus(
-          jobId,
+          job.id,
           JobStatus.failed,
           'Missing transcript or sentiment in completed webhook',
         );
         this.logger.error(
-          `Webhook callback missing transcript/sentiment for completed job: ${jobId}`,
+          `Webhook callback missing transcript/sentiment for completed job: ${job.id}`,
         );
         throw new BadRequestException(
           'Missing transcript or sentiment for completed job',
@@ -245,37 +295,37 @@ export class AudioAnalysisService {
       // Prevent duplicate analysis result creation
       let existingResult = null;
       try {
-        existingResult = await this.analysisResultsService.findByJobId(jobId);
+        existingResult = await this.analysisResultsService.findByJobId(job.id);
       } catch (err) {}
       if (!existingResult) {
         await this.analysisResultsService.create({
-          jobId,
+          jobId: job.id,
           transcript,
           sentiment,
           metadata,
           organizationId: job.organizationId,
         });
-        this.logger.log(`Analysis result stored for job ${jobId}`);
+        this.logger.log(`Analysis result stored for job ${job.id}`);
       } else {
         this.logger.warn(
-          `Analysis result already exists for job ${jobId}, skipping creation`,
+          `Analysis result already exists for job ${job.id}, skipping creation`,
         );
       }
-      await this.jobsService.updateStatus(jobId, JobStatus.completed);
-      this.logger.log(`Job ${jobId} marked as completed via webhook`);
+      await this.jobsService.updateStatus(job.id, JobStatus.completed);
+      this.logger.log(`Job ${job.id} marked as completed via webhook`);
     } else if (status === 'failed') {
       await this.jobsService.updateStatus(
-        jobId,
+        job.id,
         JobStatus.failed,
         error || 'Unknown error from N8N',
       );
-      this.logger.log(`Job ${jobId} marked as failed via webhook: ${error}`);
+      this.logger.log(`Job ${job.id} marked as failed via webhook: ${error}`);
     } else {
       this.logger.warn(
-        `Webhook callback with unknown status for job: ${jobId}`,
+        `Webhook callback with unknown status for job: ${job.id}`,
       );
       await this.jobsService.updateStatus(
-        jobId,
+        job.id,
         JobStatus.failed,
         'Unknown status in webhook callback',
       );

@@ -2,8 +2,6 @@ import {
   Controller,
   Post,
   Body,
-  UsePipes,
-  ValidationPipe,
   BadRequestException,
   NotFoundException,
   InternalServerErrorException,
@@ -13,7 +11,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { AudioAnalysisService } from './audio-analysis.service';
-import { N8NWebhookCallbackDto, WebhookResponseDto } from './dto/webhook.dto';
+import { WebhookResponseDto } from './dto/webhook.dto';
 import { ConfigService } from '@nestjs/config';
 
 /**
@@ -44,49 +42,72 @@ export class AudioAnalysisWebhookController {
     this.logger.log(`Headers: ${JSON.stringify(headers)}`);
     this.logger.log(`Raw Data Type: ${typeof data}`);
     this.logger.log(`Raw Data: ${JSON.stringify(data)}`);
-    
+
     try {
       // Webhook endpoint bypasses organization guards as it's an internal N8N callback
       this.logger.log('Getting N8N_WEBHOOK_SECRET from config...');
       let expectedSecret: string | undefined;
       try {
         expectedSecret = this.configService.get<string>('N8N_WEBHOOK_SECRET');
-        this.logger.log(`Expected Secret: ${expectedSecret ? '[SET]' : '[NOT_SET]'}`);
+        this.logger.log(
+          `Expected Secret: ${expectedSecret ? '[SET]' : '[NOT_SET]'}`,
+        );
       } catch (configError) {
-        this.logger.error('Error getting N8N_WEBHOOK_SECRET from config:', configError);
+        this.logger.error(
+          'Error getting N8N_WEBHOOK_SECRET from config:',
+          configError,
+        );
         expectedSecret = undefined;
       }
-      
+
       const receivedSecret =
         headers['x-n8n-webhook-secret'] || headers['X-N8N-WEBHOOK-SECRET'];
-      this.logger.log(`Received Secret: ${receivedSecret ? '[RECEIVED]' : '[NOT_RECEIVED]'}`);
-      
+      this.logger.log(
+        `Received Secret: ${receivedSecret ? '[RECEIVED]' : '[NOT_RECEIVED]'}`,
+      );
+
       if (expectedSecret && receivedSecret !== expectedSecret) {
         this.logger.warn('Secret validation failed');
         throw new BadRequestException('Invalid webhook secret');
       }
-      
+
       this.logger.log('Secret validation passed or skipped');
-      
+
       // Handle array format - take the first element if it's an array
       const webhookData = Array.isArray(data) ? data[0] : data;
       this.logger.log(`Processed webhook data: ${JSON.stringify(webhookData)}`);
-      
+
       if (!webhookData) {
         this.logger.error('Webhook data is null or undefined');
         throw new BadRequestException('Empty webhook payload');
       }
-      
-      if (!webhookData.jobId) {
-        this.logger.error('Missing jobId in webhook data');
-        throw new BadRequestException('Missing jobId in webhook payload');
+
+      if (!webhookData.jobId && !webhookData.externalReferenceId) {
+        this.logger.error(
+          'Missing both jobId and externalReferenceId in webhook data',
+        );
+        throw new BadRequestException(
+          'Missing jobId or externalReferenceId in webhook payload',
+        );
       }
-      
-      this.logger.log(`Processing webhook for jobId: ${webhookData.jobId}`);
-      this.logger.log(`JobId details - type: ${typeof webhookData.jobId}, length: ${webhookData.jobId?.length}`);
-      this.logger.log(`JobId raw: '${webhookData.jobId}'`);
+
+      // Prefer externalReferenceId over jobId for lookup
+      if (webhookData.externalReferenceId) {
+        this.logger.log(
+          `Processing webhook for externalReferenceId: ${webhookData.externalReferenceId}`,
+        );
+        this.logger.log(
+          `ExternalReferenceId details - type: ${typeof webhookData.externalReferenceId}, length: ${webhookData.externalReferenceId?.length}`,
+        );
+      } else {
+        this.logger.log(`Processing webhook for jobId: ${webhookData.jobId}`);
+        this.logger.log(
+          `JobId details - type: ${typeof webhookData.jobId}, length: ${webhookData.jobId?.length}`,
+        );
+        this.logger.log(`JobId raw: '${webhookData.jobId}'`);
+      }
       await this.audioAnalysisService.processWebhookCallback(webhookData);
-      
+
       this.logger.log('Webhook processed successfully');
       return {
         success: true,
@@ -97,12 +118,15 @@ export class AudioAnalysisWebhookController {
       this.logger.error(`Error Type: ${error.constructor.name}`);
       this.logger.error(`Error Message: ${error.message}`);
       this.logger.error(`Error Stack: ${error.stack}`);
-      
-      if (error instanceof BadRequestException || error instanceof NotFoundException) {
+
+      if (
+        error instanceof BadRequestException ||
+        error instanceof NotFoundException
+      ) {
         this.logger.warn('Rethrowing known exception');
         throw error;
       }
-      
+
       if (error.message?.includes('not found')) {
         this.logger.warn('Job not found error detected');
         throw new NotFoundException(`Job not found for webhook processing`);
@@ -113,7 +137,7 @@ export class AudioAnalysisWebhookController {
           `Invalid webhook payload: ${error.message}`,
         );
       }
-      
+
       this.logger.error('Throwing internal server error');
       throw new InternalServerErrorException(
         `Failed to process webhook callback: ${error.message}`,

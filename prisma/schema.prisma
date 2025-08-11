@@ -85,15 +85,16 @@ enum UserRole {
 }
 
 model Job {
-  id             String    @id @default(uuid())
-  status         JobStatus @default(pending)
-  fileId         String
-  organizationId String
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  startedAt      DateTime?
-  completedAt    DateTime?
-  error          String?
+  id                  String    @id @default(uuid())
+  status              JobStatus @default(pending)
+  fileId              String
+  organizationId      String
+  externalReferenceId String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  startedAt           DateTime?
+  completedAt         DateTime?
+  error               String?
   
   storage        Storage   @relation(fields: [fileId], references: [id])
   organization   Organization @relation(fields: [organizationId], references: [id])
@@ -101,6 +102,7 @@ model Job {
 
   @@index([organizationId])
   @@index([organizationId, status])
+  @@index([externalReferenceId])
 }
 
 model AnalysisResult {
