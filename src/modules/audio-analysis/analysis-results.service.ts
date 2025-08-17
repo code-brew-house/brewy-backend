@@ -145,6 +145,49 @@ export class AnalysisResultsService {
   }
 
   /**
+   * Find all analysis results with pagination support
+   * organizationId is required for data security.
+   */
+  async findAllPaginated(
+    organizationId: string,
+    page: number = 1,
+    limit: number = 20,
+    sortBy: string = 'createdAt',
+    sortOrder: 'asc' | 'desc' = 'desc',
+  ) {
+    const skip = (page - 1) * limit;
+    const whereClause = { organizationId };
+
+    // Get total count for pagination metadata
+    const total = await this.prisma.analysisResult.count({
+      where: whereClause,
+    });
+
+    const results = await this.prisma.analysisResult.findMany({
+      where: whereClause,
+      include: {
+        job: {
+          include: {
+            storage: true,
+          },
+        },
+      },
+      orderBy: {
+        [sortBy]: sortOrder,
+      },
+      skip,
+      take: limit,
+    });
+
+    return {
+      data: results,
+      total,
+      page,
+      limit,
+    };
+  }
+
+  /**
    * Validate if a user can access an analysis result based on organization context
    */
   async validateAnalysisResultAccess(

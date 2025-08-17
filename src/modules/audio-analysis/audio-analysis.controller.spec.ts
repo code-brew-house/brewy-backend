@@ -16,6 +16,7 @@ describe('AudioAnalysisController', () => {
     uploadAndProcess: jest.fn(),
     getJobStatus: jest.fn(),
     getAnalysisResults: jest.fn(),
+    getAllAnalysisResults: jest.fn(),
   };
 
   const mockConfigService = {
@@ -299,6 +300,150 @@ describe('AudioAnalysisController', () => {
 
       await expect(
         controller.getAnalysisResults(jobId, mockUser, mockOrganizationId),
+      ).rejects.toThrow(
+        new InternalServerErrorException('Failed to retrieve analysis results'),
+      );
+    });
+  });
+
+  describe('getAllAnalysisResults', () => {
+    const mockUser = {
+      id: 'user-id',
+      username: 'testuser',
+      email: 'test@example.com',
+      fullName: 'Test User',
+      organizationId: 'org-id-123',
+      role: 'ADMIN' as const,
+    };
+    const mockOrganizationId = 'org-id-123';
+    const mockQuery = {
+      page: 1,
+      limit: 20,
+      sortBy: 'createdAt',
+      sortOrder: 'desc' as const,
+    };
+    const mockPaginatedResults = {
+      data: [
+        {
+          id: 'result-1',
+          jobId: 'job-1',
+          transcript: 'Test transcript 1',
+          sentiment: 'positive',
+          metadata: { confidence: 0.95 },
+          createdAt: new Date(),
+          job: {
+            id: 'job-1',
+            status: JobStatus.completed,
+            file: {
+              filename: 'test1.mp3',
+              size: 1024,
+            },
+          },
+        },
+      ],
+      meta: {
+        page: 1,
+        limit: 20,
+        total: 1,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPreviousPage: false,
+      },
+    };
+
+    it('should return paginated analysis results for organization', async () => {
+      mockAudioAnalysisService.getAllAnalysisResults.mockResolvedValue(
+        mockPaginatedResults,
+      );
+
+      const result = await controller.getAllAnalysisResults(
+        mockQuery,
+        mockUser,
+        mockOrganizationId,
+      );
+
+      expect(
+        mockAudioAnalysisService.getAllAnalysisResults,
+      ).toHaveBeenCalledWith(mockQuery, mockOrganizationId);
+      expect(result).toEqual(mockPaginatedResults);
+    });
+
+    it('should return analysis results for SUPER_OWNER without organization filter', async () => {
+      const superOwnerUser = { ...mockUser, role: 'SUPER_OWNER' as const };
+      mockAudioAnalysisService.getAllAnalysisResults.mockResolvedValue(
+        mockPaginatedResults,
+      );
+
+      const result = await controller.getAllAnalysisResults(
+        mockQuery,
+        superOwnerUser,
+        mockOrganizationId,
+      );
+
+      expect(
+        mockAudioAnalysisService.getAllAnalysisResults,
+      ).toHaveBeenCalledWith(mockQuery, undefined);
+      expect(result).toEqual(mockPaginatedResults);
+    });
+
+    it('should handle empty results', async () => {
+      const emptyResults = {
+        data: [],
+        meta: {
+          page: 1,
+          limit: 20,
+          total: 0,
+          totalPages: 0,
+          hasNextPage: false,
+          hasPreviousPage: false,
+        },
+      };
+      mockAudioAnalysisService.getAllAnalysisResults.mockResolvedValue(
+        emptyResults,
+      );
+
+      const result = await controller.getAllAnalysisResults(
+        mockQuery,
+        mockUser,
+        mockOrganizationId,
+      );
+
+      expect(result).toEqual(emptyResults);
+    });
+
+    it('should handle pagination parameters correctly', async () => {
+      const customQuery = {
+        page: 2,
+        limit: 10,
+        sortBy: 'createdAt',
+        sortOrder: 'asc' as const,
+      };
+      mockAudioAnalysisService.getAllAnalysisResults.mockResolvedValue(
+        mockPaginatedResults,
+      );
+
+      await controller.getAllAnalysisResults(
+        customQuery,
+        mockUser,
+        mockOrganizationId,
+      );
+
+      expect(
+        mockAudioAnalysisService.getAllAnalysisResults,
+      ).toHaveBeenCalledWith(customQuery, mockOrganizationId);
+    });
+
+    it('should handle generic errors from service', async () => {
+      mockAudioAnalysisService.getAllAnalysisResults.mockRejectedValue(
+        new Error('Database connection failed'),
+      );
+
+      await expect(
+        controller.getAllAnalysisResults(
+          mockQuery,
+          mockUser,
+          mockOrganizationId,
+        ),
       ).rejects.toThrow(
         new InternalServerErrorException('Failed to retrieve analysis results'),
       );

@@ -12,6 +12,7 @@ describe('AnalysisResultsService', () => {
       findUnique: jest.fn(),
       findFirst: jest.fn(),
       findMany: jest.fn(),
+      count: jest.fn(),
     },
   };
 
@@ -40,6 +41,7 @@ describe('AnalysisResultsService', () => {
         transcript: 'Test transcript',
         sentiment: 'positive',
         metadata: { confidence: 0.95 },
+        organizationId: 'org-123',
       };
 
       const mockResult = {
@@ -64,6 +66,7 @@ describe('AnalysisResultsService', () => {
         transcript: 'Test transcript',
         sentiment: 'positive',
         metadata: { confidence: 0.95 },
+        organizationId: 'org-123',
       };
 
       const constraintError = new Error('Unique constraint failed');
@@ -83,6 +86,7 @@ describe('AnalysisResultsService', () => {
         transcript: 'Test transcript',
         sentiment: 'positive',
         metadata: { confidence: 0.95 },
+        organizationId: 'org-123',
       };
 
       const connectionError = new Error('Connection timed out');
@@ -101,6 +105,7 @@ describe('AnalysisResultsService', () => {
         transcript: 'Test transcript',
         sentiment: 'positive',
         metadata: { confidence: 0.95 },
+        organizationId: 'org-123',
       };
 
       const fkError = new Error('Foreign key constraint failed');
@@ -117,6 +122,7 @@ describe('AnalysisResultsService', () => {
         jobId: 'job-id',
         // transcript missing
         sentiment: 'positive',
+        organizationId: 'org-123',
       };
 
       const requiredFieldError = new Error('Field "transcript" is required');
@@ -143,6 +149,7 @@ describe('AnalysisResultsService', () => {
             booleanValue: true,
           },
         },
+        organizationId: 'org-123',
       };
 
       const mockResult = {
@@ -277,9 +284,10 @@ describe('AnalysisResultsService', () => {
 
       mockPrismaService.analysisResult.findMany.mockResolvedValue(mockResults);
 
-      const result = await service.findAll();
+      const result = await service.findAll('org-123');
 
       expect(mockPrismaService.analysisResult.findMany).toHaveBeenCalledWith({
+        where: { organizationId: 'org-123' },
         include: {
           job: {
             include: {
@@ -292,6 +300,152 @@ describe('AnalysisResultsService', () => {
         },
       });
       expect(result).toEqual(mockResults);
+    });
+  });
+
+  describe('findAllPaginated', () => {
+    it('should return paginated analysis results with default parameters', async () => {
+      const organizationId = 'org-123';
+      const mockCount = 25;
+      const mockResults = [
+        {
+          id: 'result-1',
+          jobId: 'job-1',
+          organizationId,
+          transcript: 'Test transcript 1',
+          sentiment: 'positive',
+          createdAt: new Date('2024-01-01'),
+          job: {
+            id: 'job-1',
+            status: 'completed',
+            storage: {
+              filename: 'test1.mp3',
+              size: 1024,
+            },
+          },
+        },
+        {
+          id: 'result-2',
+          jobId: 'job-2',
+          organizationId,
+          transcript: 'Test transcript 2',
+          sentiment: 'negative',
+          createdAt: new Date('2024-01-02'),
+          job: {
+            id: 'job-2',
+            status: 'completed',
+            storage: {
+              filename: 'test2.mp3',
+              size: 2048,
+            },
+          },
+        },
+      ];
+
+      mockPrismaService.analysisResult.count.mockResolvedValue(mockCount);
+      mockPrismaService.analysisResult.findMany.mockResolvedValue(mockResults);
+
+      const result = await service.findAllPaginated(organizationId);
+
+      expect(mockPrismaService.analysisResult.count).toHaveBeenCalledWith({
+        where: { organizationId },
+      });
+      expect(mockPrismaService.analysisResult.findMany).toHaveBeenCalledWith({
+        where: { organizationId },
+        include: {
+          job: {
+            include: {
+              storage: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip: 0,
+        take: 20,
+      });
+      expect(result).toEqual({
+        data: mockResults,
+        total: mockCount,
+        page: 1,
+        limit: 20,
+      });
+    });
+
+    it('should return paginated analysis results with custom parameters', async () => {
+      const organizationId = 'org-123';
+      const page = 2;
+      const limit = 10;
+      const sortBy = 'createdAt';
+      const sortOrder = 'asc';
+      const mockCount = 25;
+      const mockResults: any[] = [];
+
+      mockPrismaService.analysisResult.count.mockResolvedValue(mockCount);
+      mockPrismaService.analysisResult.findMany.mockResolvedValue(mockResults);
+
+      const result = await service.findAllPaginated(
+        organizationId,
+        page,
+        limit,
+        sortBy,
+        sortOrder,
+      );
+
+      expect(mockPrismaService.analysisResult.count).toHaveBeenCalledWith({
+        where: { organizationId },
+      });
+      expect(mockPrismaService.analysisResult.findMany).toHaveBeenCalledWith({
+        where: { organizationId },
+        include: {
+          job: {
+            include: {
+              storage: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'asc',
+        },
+        skip: 10, // (page - 1) * limit = (2 - 1) * 10
+        take: 10,
+      });
+      expect(result).toEqual({
+        data: mockResults,
+        total: mockCount,
+        page: 2,
+        limit: 10,
+      });
+    });
+
+    it('should handle empty results', async () => {
+      const organizationId = 'org-empty';
+      const mockCount = 0;
+      const mockResults: any[] = [];
+
+      mockPrismaService.analysisResult.count.mockResolvedValue(mockCount);
+      mockPrismaService.analysisResult.findMany.mockResolvedValue(mockResults);
+
+      const result = await service.findAllPaginated(organizationId);
+
+      expect(result).toEqual({
+        data: [],
+        total: 0,
+        page: 1,
+        limit: 20,
+      });
+    });
+
+    it('should handle database errors', async () => {
+      const organizationId = 'org-123';
+      const dbError = new Error('Database connection failed');
+
+      mockPrismaService.analysisResult.count.mockRejectedValue(dbError);
+
+      await expect(service.findAllPaginated(organizationId)).rejects.toThrow(
+        'Database connection failed',
+      );
     });
   });
 });

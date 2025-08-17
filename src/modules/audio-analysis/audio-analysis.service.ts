@@ -10,6 +10,10 @@ import { JobsService } from '../jobs/jobs.service';
 import { AnalysisResultsService } from './analysis-results.service';
 import { N8NWebhookService } from './n8n-webhook.service';
 import { N8NWebhookPayloadDto } from './dto/webhook.dto';
+import {
+  ListAnalysisResultsQueryDto,
+  ListAnalysisResultsDto,
+} from './dto/list-analysis-results.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 
 /**
@@ -260,6 +264,53 @@ export class AudioAnalysisService {
         },
       },
     };
+  }
+
+  /**
+   * Get all analysis results for organization with pagination
+   */
+  async getAllAnalysisResults(
+    query: ListAnalysisResultsQueryDto,
+    organizationId?: string,
+  ): Promise<ListAnalysisResultsDto> {
+    if (!organizationId) {
+      throw new Error('Organization ID is required for data security');
+    }
+
+    const { page, limit, sortBy, sortOrder } = query;
+
+    const result = await this.analysisResultsService.findAllPaginated(
+      organizationId,
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+    );
+
+    // Transform the data to match DTO structure
+    const transformedData = result.data.map((analysisResult) => ({
+      id: analysisResult.id,
+      jobId: analysisResult.jobId,
+      transcript: analysisResult.transcript,
+      sentiment: analysisResult.sentiment,
+      metadata: analysisResult.metadata,
+      createdAt: analysisResult.createdAt,
+      job: {
+        id: analysisResult.job.id,
+        status: analysisResult.job.status,
+        file: {
+          filename: analysisResult.job.storage.filename,
+          size: analysisResult.job.storage.size,
+        },
+      },
+    }));
+
+    return new ListAnalysisResultsDto(
+      transformedData,
+      result.total,
+      result.page,
+      result.limit,
+    );
   }
 
   /**

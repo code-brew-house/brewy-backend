@@ -25,6 +25,7 @@ describe('AudioAnalysisService', () => {
   const mockAnalysisResultsService = {
     create: jest.fn(),
     findByJobId: jest.fn(),
+    findAllPaginated: jest.fn(),
   };
 
   const mockN8NWebhookService = {
@@ -726,6 +727,157 @@ describe('AudioAnalysisService', () => {
       await expect(
         service.processWebhookCallback(callbackData),
       ).rejects.toThrow('Status update failed');
+    });
+  });
+
+  describe('getAllAnalysisResults', () => {
+    it('should return paginated analysis results with transformed data', async () => {
+      const organizationId = 'org-123';
+      const mockQuery = {
+        page: 1,
+        limit: 20,
+        sortBy: 'createdAt',
+        sortOrder: 'desc' as const,
+      };
+      const mockPaginatedData = {
+        data: [
+          {
+            id: 'result-1',
+            jobId: 'job-1',
+            transcript: 'Test transcript 1',
+            sentiment: 'positive',
+            metadata: { confidence: 0.95 },
+            createdAt: new Date('2024-01-01'),
+            job: {
+              id: 'job-1',
+              status: 'completed',
+              storage: {
+                filename: 'test1.mp3',
+                size: 1024,
+              },
+            },
+          },
+          {
+            id: 'result-2',
+            jobId: 'job-2',
+            transcript: 'Test transcript 2',
+            sentiment: 'negative',
+            metadata: { confidence: 0.85 },
+            createdAt: new Date('2024-01-02'),
+            job: {
+              id: 'job-2',
+              status: 'completed',
+              storage: {
+                filename: 'test2.mp3',
+                size: 2048,
+              },
+            },
+          },
+        ],
+        total: 25,
+        page: 1,
+        limit: 20,
+      };
+
+      mockAnalysisResultsService.findAllPaginated.mockResolvedValue(
+        mockPaginatedData,
+      );
+
+      const result = await service.getAllAnalysisResults(
+        mockQuery,
+        organizationId,
+      );
+
+      expect(mockAnalysisResultsService.findAllPaginated).toHaveBeenCalledWith(
+        organizationId,
+        mockQuery.page,
+        mockQuery.limit,
+        mockQuery.sortBy,
+        mockQuery.sortOrder,
+      );
+      expect(result.data).toHaveLength(2);
+      expect(result.data[0]).toEqual({
+        id: 'result-1',
+        jobId: 'job-1',
+        transcript: 'Test transcript 1',
+        sentiment: 'positive',
+        metadata: { confidence: 0.95 },
+        createdAt: new Date('2024-01-01'),
+        job: {
+          id: 'job-1',
+          status: 'completed',
+          file: {
+            filename: 'test1.mp3',
+            size: 1024,
+          },
+        },
+      });
+      expect(result.meta.total).toBe(25);
+      expect(result.meta.page).toBe(1);
+      expect(result.meta.limit).toBe(20);
+    });
+
+    it('should throw error when organization ID is missing', async () => {
+      const mockQuery = {
+        page: 1,
+        limit: 20,
+        sortBy: 'createdAt',
+        sortOrder: 'desc' as const,
+      };
+
+      await expect(
+        service.getAllAnalysisResults(mockQuery, undefined),
+      ).rejects.toThrow('Organization ID is required for data security');
+
+      expect(
+        mockAnalysisResultsService.findAllPaginated,
+      ).not.toHaveBeenCalled();
+    });
+
+    it('should handle empty results', async () => {
+      const organizationId = 'org-empty';
+      const mockQuery = {
+        page: 1,
+        limit: 20,
+        sortBy: 'createdAt',
+        sortOrder: 'desc' as const,
+      };
+      const mockEmptyData = {
+        data: [],
+        total: 0,
+        page: 1,
+        limit: 20,
+      };
+
+      mockAnalysisResultsService.findAllPaginated.mockResolvedValue(
+        mockEmptyData,
+      );
+
+      const result = await service.getAllAnalysisResults(
+        mockQuery,
+        organizationId,
+      );
+
+      expect(result.data).toHaveLength(0);
+      expect(result.meta.total).toBe(0);
+    });
+
+    it('should handle database errors', async () => {
+      const organizationId = 'org-123';
+      const mockQuery = {
+        page: 1,
+        limit: 20,
+        sortBy: 'createdAt',
+        sortOrder: 'desc' as const,
+      };
+
+      mockAnalysisResultsService.findAllPaginated.mockRejectedValue(
+        new Error('Database connection failed'),
+      );
+
+      await expect(
+        service.getAllAnalysisResults(mockQuery, organizationId),
+      ).rejects.toThrow('Database connection failed');
     });
   });
 });

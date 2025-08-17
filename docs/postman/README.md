@@ -4,9 +4,14 @@ This directory contains comprehensive Postman collections and environments for t
 
 ## Files
 
-- **`Brewy-Organization-Management.postman_collection.json`** - Complete API collection (now covers all backend endpoints)
+- **`Brewy-Organization-Management.postman_collection.json`** - Complete API collection (v2.1.0 with paginated analysis results)
 - **`Brewy-Organization-Environment.postman_environment.json`** - Environment variables
+- **`Get-All-Analysis-Results.postman_request.json`** - Standalone request collection for the new paginated endpoint
 - **`README.md`** - This documentation file
+
+## Additional Documentation
+
+- **`../api-endpoints/audio-analysis-results-pagination.md`** - Comprehensive API documentation for the new paginated endpoint
 
 ## Quick Start
 
@@ -84,6 +89,7 @@ The collection is organized to follow a logical testing flow:
 - **Upload Audio for Analysis** - Upload and process audio files (20MB limit)
 - **Get Job Status** - Check analysis job progress
 - **Get Analysis Results** - Retrieve completed analysis results
+- **Get All Analysis Results (Paginated)** - Fetch all analysis results with pagination and filtering
 
 ### 9. Audio Analysis Webhook
 - **Process Webhook** - Handle analysis service callbacks
@@ -160,6 +166,7 @@ The collection uses these environment variables (automatically managed):
 - Audio file processing (20MB limit)
 - Asynchronous job tracking
 - Analysis results retrieval
+- Paginated analysis results with filtering and sorting
 - Webhook handling for external services
 
 ### ✅ **Organization Limits**
@@ -188,6 +195,60 @@ The collection uses these environment variables (automatically managed):
 - Name-based organization search
 - Email-based filtering
 - Pagination support
+- Audio analysis results pagination with sorting
+
+## New Features in v2.1.0
+
+### 🎵 **Paginated Audio Analysis Results**
+
+The collection now includes a new endpoint for retrieving all audio analysis results with advanced pagination and filtering capabilities:
+
+**Endpoint:** `GET /audio-analysis/results`
+
+**Query Parameters:**
+- `page` (optional): Page number (default: 1)
+- `limit` (optional): Results per page (max: 100, default: 20)
+- `sortBy` (optional): Field to sort by (default: createdAt)
+- `sortOrder` (optional): Sort direction - `asc` or `desc` (default: desc)
+
+**Response Structure:**
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "jobId": "uuid",
+      "transcript": "Transcribed text content...",
+      "sentiment": "positive|negative|neutral",
+      "metadata": { "confidence": 0.95 },
+      "createdAt": "2024-01-01T00:00:00Z",
+      "job": {
+        "id": "uuid",
+        "status": "completed",
+        "file": {
+          "filename": "audio.mp3",
+          "size": 1024
+        }
+      }
+    }
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "total": 100,
+    "totalPages": 5,
+    "hasNextPage": true,
+    "hasPreviousPage": false
+  }
+}
+```
+
+**Features:**
+- **Organization Isolation**: Users see only their organization's results
+- **SUPER_OWNER Access**: Super owners can access results from all organizations
+- **Latest First**: Results sorted by creation date (newest first) by default
+- **Efficient Pagination**: Optimized database queries with metadata
+- **Comprehensive Testing**: Validates response structure and pagination metadata
 
 ## New Features & Improvements
 

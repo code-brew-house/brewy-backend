@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Param,
+  Query,
   UploadedFile,
   UseInterceptors,
   UseGuards,
@@ -17,6 +18,10 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { AudioAnalysisService } from './audio-analysis.service';
 import { JobStatusDto } from './dto/job-status.dto';
 import { AnalysisResultsDto } from './dto/analysis-results.dto';
+import {
+  ListAnalysisResultsQueryDto,
+  ListAnalysisResultsDto,
+} from './dto/list-analysis-results.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { OrganizationGuard } from '../../common/guards/organization.guard';
@@ -157,6 +162,35 @@ export class AudioAnalysisController {
           `Analysis results for job ${jobId} not found`,
         );
       }
+      throw new InternalServerErrorException(
+        'Failed to retrieve analysis results',
+      );
+    }
+  }
+
+  /**
+   * Get all analysis results for the organization with pagination
+   * @param query - Pagination and sorting query parameters
+   * @param user - Current authenticated user
+   * @param organizationId - Organization ID from authenticated user
+   * @returns Paginated list of analysis results
+   */
+  @Get('results')
+  @HttpCode(HttpStatus.OK)
+  @Roles('SUPER_OWNER', 'OWNER', 'ADMIN', 'AGENT')
+  async getAllAnalysisResults(
+    @Query() query: ListAnalysisResultsQueryDto,
+    @CurrentUser() user: RequestUser,
+    @Organization() organizationId: string,
+  ): Promise<ListAnalysisResultsDto> {
+    try {
+      const filterOrgId =
+        user.role === 'SUPER_OWNER' ? undefined : organizationId;
+      return await this.audioAnalysisService.getAllAnalysisResults(
+        query,
+        filterOrgId,
+      );
+    } catch (error) {
       throw new InternalServerErrorException(
         'Failed to retrieve analysis results',
       );

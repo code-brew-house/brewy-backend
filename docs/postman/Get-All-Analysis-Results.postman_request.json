@@ -1,0 +1,290 @@
+{
+  "info": {
+    "name": "Get All Analysis Results (Paginated)",
+    "description": "Standalone Postman request for the new paginated audio analysis results endpoint. This endpoint retrieves all audio analysis results for an organization with pagination, sorting, and filtering capabilities.",
+    "version": "1.0.0",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwt_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Get All Analysis Results (Default Pagination)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response has paginated data structure', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('data');",
+              "    pm.expect(jsonData).to.have.property('meta');",
+              "    pm.expect(jsonData.meta).to.have.property('page');",
+              "    pm.expect(jsonData.meta).to.have.property('limit');",
+              "    pm.expect(jsonData.meta).to.have.property('total');",
+              "    pm.expect(jsonData.meta).to.have.property('totalPages');",
+              "    pm.expect(jsonData.meta).to.have.property('hasNextPage');",
+              "    pm.expect(jsonData.meta).to.have.property('hasPreviousPage');",
+              "});",
+              "",
+              "pm.test('Analysis results have correct structure', function () {",
+              "    var jsonData = pm.response.json();",
+              "    if (jsonData.data.length > 0) {",
+              "        var result = jsonData.data[0];",
+              "        pm.expect(result).to.have.property('id');",
+              "        pm.expect(result).to.have.property('jobId');",
+              "        pm.expect(result).to.have.property('transcript');",
+              "        pm.expect(result).to.have.property('sentiment');",
+              "        pm.expect(result).to.have.property('createdAt');",
+              "        pm.expect(result).to.have.property('job');",
+              "        pm.expect(result.job).to.have.property('id');",
+              "        pm.expect(result.job).to.have.property('status');",
+              "        pm.expect(result.job).to.have.property('file');",
+              "        pm.expect(result.job.file).to.have.property('filename');",
+              "        pm.expect(result.job.file).to.have.property('size');",
+              "    }",
+              "});",
+              "",
+              "pm.test('Pagination metadata is valid', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.meta.page).to.be.a('number');",
+              "    pm.expect(jsonData.meta.limit).to.be.a('number');",
+              "    pm.expect(jsonData.meta.total).to.be.a('number');",
+              "    pm.expect(jsonData.meta.totalPages).to.be.a('number');",
+              "    pm.expect(jsonData.meta.hasNextPage).to.be.a('boolean');",
+              "    pm.expect(jsonData.meta.hasPreviousPage).to.be.a('boolean');",
+              "    pm.expect(jsonData.meta.page).to.be.at.least(1);",
+              "    pm.expect(jsonData.meta.limit).to.be.at.least(1);",
+              "    pm.expect(jsonData.meta.total).to.be.at.least(0);",
+              "});",
+              "",
+              "console.log('📊 Pagination Info:', {",
+              "    page: pm.response.json().meta.page,",
+              "    limit: pm.response.json().meta.limit,",
+              "    total: pm.response.json().meta.total,",
+              "    totalPages: pm.response.json().meta.totalPages,",
+              "    resultsCount: pm.response.json().data.length",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/audio-analysis/results",
+          "host": ["{{base_url}}"],
+          "path": ["audio-analysis", "results"],
+          "description": "Get all analysis results with default pagination (page=1, limit=20, sortBy=createdAt, sortOrder=desc)"
+        },
+        "description": "Retrieve all audio analysis results for the authenticated user's organization with default pagination settings."
+      }
+    },
+    {
+      "name": "Get All Analysis Results (Custom Pagination)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response respects custom pagination parameters', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.meta.page).to.equal(parseInt(pm.request.url.query.get('page')));",
+              "    pm.expect(jsonData.meta.limit).to.equal(parseInt(pm.request.url.query.get('limit')));",
+              "    pm.expect(jsonData.data.length).to.be.at.most(jsonData.meta.limit);",
+              "});",
+              "",
+              "pm.test('Results are sorted correctly', function () {",
+              "    var jsonData = pm.response.json();",
+              "    var sortOrder = pm.request.url.query.get('sortOrder');",
+              "    ",
+              "    if (jsonData.data.length > 1) {",
+              "        var first = new Date(jsonData.data[0].createdAt);",
+              "        var second = new Date(jsonData.data[1].createdAt);",
+              "        ",
+              "        if (sortOrder === 'asc') {",
+              "            pm.expect(first.getTime()).to.be.at.most(second.getTime());",
+              "        } else {",
+              "            pm.expect(first.getTime()).to.be.at.least(second.getTime());",
+              "        }",
+              "    }",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/audio-analysis/results?page=2&limit=10&sortBy=createdAt&sortOrder=asc",
+          "host": ["{{base_url}}"],
+          "path": ["audio-analysis", "results"],
+          "query": [
+            {
+              "key": "page",
+              "value": "2",
+              "description": "Page number (starts from 1)"
+            },
+            {
+              "key": "limit",
+              "value": "10",
+              "description": "Number of results per page (1-100)"
+            },
+            {
+              "key": "sortBy",
+              "value": "createdAt",
+              "description": "Field to sort by (currently supports: createdAt)"
+            },
+            {
+              "key": "sortOrder",
+              "value": "asc",
+              "description": "Sort direction (asc or desc)"
+            }
+          ]
+        },
+        "description": "Retrieve analysis results with custom pagination parameters: page 2, 10 results per page, sorted by creation date in ascending order."
+      }
+    },
+    {
+      "name": "Get All Analysis Results (First Page)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('First page pagination is correct', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.meta.page).to.equal(1);",
+              "    pm.expect(jsonData.meta.hasPreviousPage).to.be.false;",
+              "    ",
+              "    if (jsonData.meta.total > jsonData.meta.limit) {",
+              "        pm.expect(jsonData.meta.hasNextPage).to.be.true;",
+              "    }",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/audio-analysis/results?page=1&limit=5",
+          "host": ["{{base_url}}"],
+          "path": ["audio-analysis", "results"],
+          "query": [
+            {
+              "key": "page",
+              "value": "1",
+              "description": "First page"
+            },
+            {
+              "key": "limit",
+              "value": "5",
+              "description": "Small page size for testing"
+            }
+          ]
+        },
+        "description": "Test first page pagination behavior with a small page size."
+      }
+    },
+    {
+      "name": "Get All Analysis Results (Large Limit)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Status code is 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Large limit is respected', function () {",
+              "    var jsonData = pm.response.json();",
+              "    pm.expect(jsonData.meta.limit).to.equal(100);",
+              "    pm.expect(jsonData.data.length).to.be.at.most(100);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/audio-analysis/results?limit=100",
+          "host": ["{{base_url}}"],
+          "path": ["audio-analysis", "results"],
+          "query": [
+            {
+              "key": "limit",
+              "value": "100",
+              "description": "Maximum allowed page size"
+            }
+          ]
+        },
+        "description": "Test with maximum allowed page size (100 results)."
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000",
+      "type": "string",
+      "description": "Base URL for the Brewy API"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string",
+      "description": "JWT authentication token (set automatically by login requests)"
+    }
+  ]
+}

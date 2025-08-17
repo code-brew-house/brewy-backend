@@ -1,8 +1,8 @@
 {
   "info": {
     "name": "Brewy Backend API Collection",
-    "description": "Complete API collection for Brewy backend services including authentication, organization management, storage operations, audio analysis, user management, and health checks. Features global JWT token management and comprehensive endpoint coverage.",
-    "version": "2.0.0",
+    "description": "Complete API collection for Brewy backend services including authentication, organization management, storage operations, audio analysis with pagination, user management, and health checks. Features global JWT token management and comprehensive endpoint coverage. v2.1.0 adds paginated audio analysis results endpoint.",
+    "version": "2.1.0",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "auth": {
@@ -1356,6 +1356,82 @@
               "raw": "{{base_url}}/audio-analysis/job/{{audio_job_id}}/results",
               "host": ["{{base_url}}"],
               "path": ["audio-analysis", "job", "{{audio_job_id}}", "results"]
+            }
+          }
+        },
+        {
+          "name": "Get All Analysis Results (Paginated)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Response has paginated data structure', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('data');",
+                  "    pm.expect(jsonData).to.have.property('meta');",
+                  "    pm.expect(jsonData.meta).to.have.property('page');",
+                  "    pm.expect(jsonData.meta).to.have.property('limit');",
+                  "    pm.expect(jsonData.meta).to.have.property('total');",
+                  "    pm.expect(jsonData.meta).to.have.property('totalPages');",
+                  "    pm.expect(jsonData.meta).to.have.property('hasNextPage');",
+                  "    pm.expect(jsonData.meta).to.have.property('hasPreviousPage');",
+                  "});",
+                  "",
+                  "pm.test('Analysis results have correct structure', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data.length > 0) {",
+                  "        var result = jsonData.data[0];",
+                  "        pm.expect(result).to.have.property('id');",
+                  "        pm.expect(result).to.have.property('jobId');",
+                  "        pm.expect(result).to.have.property('transcript');",
+                  "        pm.expect(result).to.have.property('sentiment');",
+                  "        pm.expect(result).to.have.property('createdAt');",
+                  "        pm.expect(result).to.have.property('job');",
+                  "        pm.expect(result.job).to.have.property('id');",
+                  "        pm.expect(result.job).to.have.property('status');",
+                  "        pm.expect(result.job).to.have.property('file');",
+                  "        pm.expect(result.job.file).to.have.property('filename');",
+                  "        pm.expect(result.job.file).to.have.property('size');",
+                  "    }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/audio-analysis/results?page=1&limit=20&sortBy=createdAt&sortOrder=desc",
+              "host": ["{{base_url}}"],
+              "path": ["audio-analysis", "results"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1",
+                  "description": "Page number (default: 1)"
+                },
+                {
+                  "key": "limit",
+                  "value": "20",
+                  "description": "Number of results per page (max: 100, default: 20)"
+                },
+                {
+                  "key": "sortBy",
+                  "value": "createdAt",
+                  "description": "Field to sort by (default: createdAt)"
+                },
+                {
+                  "key": "sortOrder",
+                  "value": "desc",
+                  "description": "Sort order: asc or desc (default: desc)"
+                }
+              ]
             }
           }
         }
